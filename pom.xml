@@ -5,21 +5,21 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.tabariyya</groupId>
-    <artifactId>spring-pagenation</artifactId>
+    <artifactId>spring-pagination</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>5.3.39</spring.version>
         <querydsl.version>5.0.0</querydsl.version>
     </properties>
 
-    <name>spring-pagenation</name>
+    <name>spring-pagination</name>
     <description>Spring Pagination and Filtering Library</description>
-    <url>https://github.com/tabariyya/spring-pagenation</url>
+    <url>https://github.com/tabariyya/spring-pagination</url>
 
     <licenses>
         <license>
@@ -38,9 +38,9 @@
     </developers>
 
     <scm>
-        <url>https://github.com/tabariyya/spring-pagenation</url>
-        <connection>scm:git:git://github.com/tabariyya/spring-pagenation.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com:tabariyya/spring-pagenation.git</developerConnection>
+        <url>https://github.com/tabariyya/spring-pagination</url>
+        <connection>scm:git:git://github.com/tabariyya/spring-pagination.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:tabariyya/spring-pagination.git</developerConnection>
     </scm>
 
 
