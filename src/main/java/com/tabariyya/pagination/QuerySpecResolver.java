@@ -3,7 +3,7 @@ package com.tabariyya.pagination;
 import com.querydsl.core.types.ExpressionUtils;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Predicate;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import org.reflections.Reflections;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
