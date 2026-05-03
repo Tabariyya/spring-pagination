@@ -17,9 +17,9 @@
         <querydsl.version>5.0.0</querydsl.version>
     </properties>
 
-    <name>spring-jwt</name>
-    <description>Spring Boot JWT Authentication Library</description>
-    <url>https://github.com/tabariyya/spring-jwt</url>
+    <name>spring-pagenation</name>
+    <description>Spring Pagination and Filtering Library</description>
+    <url>https://github.com/tabariyya/spring-pagenation</url>
 
     <licenses>
         <license>
@@ -38,9 +38,9 @@
     </developers>
 
     <scm>
-        <url>https://github.com/tabariyya/spring-jwt</url>
-        <connection>scm:git:git://github.com/tabariyya/spring-jwt.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com:tabariyya/spring-jwt.git</developerConnection>
+        <url>https://github.com/tabariyya/spring-pagenation</url>
+        <connection>scm:git:git://github.com/tabariyya/spring-pagenation.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:tabariyya/spring-pagenation.git</developerConnection>
     </scm>
 
 
