@@ -15,10 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +23,7 @@ import java.util.regex.Pattern;
 public class QueryBuilderService {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private final JacksonValueConverter converter = new JacksonValueConverter(objectMapper);
 
     private static final DateTimeFormatter dateTimeFormatter = new DateTimeFormatterBuilder()
             .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
@@ -85,16 +83,15 @@ public class QueryBuilderService {
      * Converts a MongoDB query language string to a Predicate.
      *
      * @param entity the name of the entity to query (e.g., "User")
-     * @param query the MongoDB query language string containing a $match clause
+     * @param query  the MongoDB query language string containing a $match clause
      * @return a {@link Predicate} representing the query conditions
-     *
-     * @throws NoClassDefFoundError if there is a capitalization typo in the class name (e.g., "User" vs "user")
-     * @throws ClassNotFoundException if the specified entity class cannot be found
-     * @throws NoSuchFieldException if the specified field does not exist in the entity class
+     * @throws NoClassDefFoundError     if there is a capitalization typo in the class name (e.g., "User" vs "user")
+     * @throws ClassNotFoundException   if the specified entity class cannot be found
+     * @throws NoSuchFieldException     if the specified field does not exist in the entity class
      * @throws IllegalArgumentException if a type conversion fails (e.g., converting a String to a LocalDateTime);
-     *         this can be resolved with a custom converter in the {@link #convertValue} method
+     *                                  this can be resolved with a custom converter in the {@link #convertValue} method
      * @throws IllegalArgumentException if the operator is not compatible with either the field type or the value type
-     * @throws ClassCastException if the operator is not compatible with either the field type or the value type
+     * @throws ClassCastException       if the operator is not compatible with either the field type or the value type
      */
     private Predicate predicateBuilder(Class<?> entity, String query) throws Throwable {
         PathBuilder<?> pathBuilder = pathBuilderOf(entity);
@@ -103,15 +100,8 @@ public class QueryBuilderService {
     }
 
     private Object convertValue(Object rawValue, Class<?> targetType) {
-        if (rawValue == null || targetType.isInstance(rawValue)) {
-            return rawValue;
-        }
 
-        if (targetType == LocalDateTime.class) {
-            return LocalDateTime.parse(rawValue.toString(), dateTimeFormatter);
-        }
-
-        return rawValue;
+        return converter.convertValue(rawValue,targetType);
     }
 
     private Predicate processNode(JsonNode node, PathBuilder<?> pathBuilder, Class<?> entityClass) throws Exception {

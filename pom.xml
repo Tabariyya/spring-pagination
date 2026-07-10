@@ -6,7 +6,7 @@
 
     <groupId>com.tabariyya</groupId>
     <artifactId>spring-pagination</artifactId>
-    <version>1.0.1.2</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <properties>
