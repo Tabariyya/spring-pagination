@@ -7,7 +7,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @ControllerAdvice
-public class InvalidFilterValueExceptionHandler {
+public class GenericExceptionHandler {
+
+    @ExceptionHandler(GenericQueryDslException.class)
+    public ResponseEntity<String> handleGenericQueryDslException(GenericQueryDslException ex) {
+        Throwable rootCause = ExceptionUtils.getRootCause(ex);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(rootCause.getMessage());
+    }
 
     @ExceptionHandler(InvalidFilterValueException.class)
     public ResponseEntity<String> handleInvalidFilterValueException(InvalidFilterValueException ex) {
