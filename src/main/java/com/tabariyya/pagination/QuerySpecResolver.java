@@ -92,12 +92,6 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
         ResolvableType generic = resolvableType.getGeneric(0);
         Class<?> entity = generic.resolve();
 
-        Reflections reflections = new Reflections("com.waleed");
-        Set<? extends Class<?>> subTypes = reflections.getSubTypesOf(entity);
-
-        for (Class<?> clazz : subTypes) {
-            return clazz;
-        }
         return entity;
     }
 }
