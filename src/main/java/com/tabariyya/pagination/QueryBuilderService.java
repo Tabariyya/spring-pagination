@@ -2,6 +2,7 @@ package com.tabariyya.pagination;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.*;
 import com.querydsl.core.types.dsl.Expressions;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import java.lang.reflect.Field;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -41,6 +41,79 @@ public class QueryBuilderService {
     public OrderSpecifier<?>[] buildOrderSpecifier(Class<?> entity, String query) {
         try {
             return orderSpecifierBuilder(entity, query);
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    /**
+     * Appends {"id": 1} to the sort specification when "id" is not already present,
+     * so that the ordering is total and keyset pagination never skips or repeats rows.
+     */
+    public String ensureIdTieBreaker(String query) {
+        try {
+            JsonNode root = decodeAndDeserialize(query);
+            if (!root.isObject()) {
+                throw new IllegalArgumentException("Sort specification must be a JSON object");
+            }
+            ObjectNode sortNode = (ObjectNode) root;
+            if (!sortNode.has("id")) {
+                sortNode.put("id", 1);
+            }
+            return objectMapper.writeValueAsString(sortNode);
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    /**
+     * Builds the keyset predicate that selects rows strictly after the last seen row:
+     * (f1 &gt; v1) OR (f1 = v1 AND f2 &gt; v2) OR ... with &gt;/&lt; chosen per field direction.
+     */
+    public Predicate buildKeysetPredicate(Class<?> entity, String orderingQuery, Map<String, Object> lastValues) {
+        try {
+            PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+            JsonNode root = decodeAndDeserialize(orderingQuery);
+
+            List<String> fieldNames = new ArrayList<>();
+            List<Order> orders = new ArrayList<>();
+            List<Object> values = new ArrayList<>();
+
+            Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                String fieldName = entry.getKey();
+                if (!lastValues.containsKey(fieldName)) {
+                    throw new InvalidCursorException("Cursor is missing last value for sort field: " + fieldName);
+                }
+                Class<?> fieldType = FieldUtils.findField(entity, fieldName).getType();
+                fieldNames.add(fieldName);
+                orders.add(entry.getValue().asInt() == 1 ? Order.ASC : Order.DESC);
+                values.add(convertValue(lastValues.get(fieldName), fieldType));
+            }
+
+            BooleanBuilder keyset = new BooleanBuilder();
+            for (int i = 0; i < fieldNames.size(); i++) {
+                BooleanBuilder branch = new BooleanBuilder();
+                for (int j = 0; j < i; j++) {
+                    branch.and(Expressions.predicate(
+                            Ops.EQ,
+                            pathBuilder.get(fieldNames.get(j)),
+                            ConstantImpl.create(values.get(j))
+                    ));
+                }
+                Ops comparison = (orders.get(i) == Order.ASC) ? Ops.GT : Ops.LT;
+                branch.and(Expressions.predicate(
+                        comparison,
+                        pathBuilder.get(fieldNames.get(i)),
+                        ConstantImpl.create(values.get(i))
+                ));
+                keyset.or(branch);
+            }
+
+            return keyset;
+        } catch (InvalidCursorException e) {
+            throw e;
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
         }
@@ -180,7 +253,7 @@ public class QueryBuilderService {
     }
 
     private Predicate processFieldCondition(String fieldName, JsonNode condition, PathBuilder<?> pathBuilder, Class<?> entityClass) throws Exception {
-        Field field = entityClass.getDeclaredField(fieldName);
+        Field field = FieldUtils.findField(entityClass, fieldName);
 
         if (!condition.isObject()) {
             Object convertedValue = convertValue(condition.asText(), field.getType());

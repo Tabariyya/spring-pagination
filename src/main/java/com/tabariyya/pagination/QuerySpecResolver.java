@@ -3,7 +3,6 @@ package com.tabariyya.pagination;
 import com.querydsl.core.types.ExpressionUtils;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Predicate;
-import org.reflections.Reflections;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -13,7 +12,7 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Set;
+import java.util.Map;
 
 @Component
 public class QuerySpecResolver implements HandlerMethodArgumentResolver {
@@ -46,45 +45,71 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             return querySpec;
         }
 
-        String filter = request.getParameter("filters");
-        String sort = request.getParameter("ordering");
-        String offset = request.getParameter("skip");
-        String limit = request.getParameter("size");
+        String cursorToken = request.getParameter("cursor");
 
-        if(filter != null && !filter.isEmpty()) {
-            Predicate predicate = queryBuilderService.buildFilter(entity, filter);
-            querySpec.setFilterQuery(predicate);
+        String filter;
+        String sort;
+        Integer size;
+        Map<String, Object> lastValues = null;
+
+        if (cursorToken != null && !cursorToken.isEmpty()) {
+            if (request.getParameter("filters") != null
+                    || request.getParameter("ordering") != null
+                    || request.getParameter("size") != null) {
+                throw new CursorParameterConflictException(
+                        "filters, ordering and size are not allowed together with a cursor; they are carried by the cursor itself");
+            }
+            Cursor cursor = CursorUtils.decode(cursorToken);
+            filter = cursor.getFilters();
+            sort = cursor.getOrdering();
+            size = cursor.getSize();
+            lastValues = cursor.getLastValues();
+            querySpec.setCursorRequest(true);
         } else {
-            querySpec.setFilterQuery(ExpressionUtils.allOf());
+            filter = request.getParameter("filters");
+            sort = request.getParameter("ordering");
+            size = parseSize(request.getParameter("size"));
         }
 
-        if(sort == null || sort.isEmpty()) {
+        if (sort == null || sort.isEmpty()) {
             sort = "{\"id\":1}";
         }
+        sort = queryBuilderService.ensureIdTieBreaker(sort);
+
+        if (size == null) {
+            size = 20;
+        }
+
+        Predicate filterPredicate = (filter != null && !filter.isEmpty())
+                ? queryBuilderService.buildFilter(entity, filter)
+                : null;
+        Predicate keysetPredicate = (lastValues != null)
+                ? queryBuilderService.buildKeysetPredicate(entity, sort, lastValues)
+                : null;
+        querySpec.setFilterQuery(ExpressionUtils.allOf(filterPredicate, keysetPredicate));
 
         OrderSpecifier<?>[] orderSpecifiers = queryBuilderService.buildOrderSpecifier(entity, sort);
         querySpec.setOrderingQuery(orderSpecifiers);
 
-        if(offset == null || offset.isEmpty()) {
-            offset = "0";
-        }
-
-        if (limit == null || limit.isEmpty()) {
-            limit = "20";
-        }
-
-        try {
-            int pageOffset = Integer.parseInt(offset);
-            int pageLimit = Integer.parseInt(limit);
-            querySpec.setOffset(pageOffset);
-            querySpec.setLimit(pageLimit);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid page or limit parameter", e);
-        }
+        querySpec.setLimit(size);
+        querySpec.setEntityClass(entity);
+        querySpec.setFilters(filter);
+        querySpec.setOrdering(sort);
 
         request.setAttribute(QuerySpec.class.getName(), querySpec);
 
         return querySpec;
+    }
+
+    private Integer parseSize(String size) {
+        if (size == null || size.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(size);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid size parameter", e);
+        }
     }
 
     private Class<?> resolveGenericType(MethodParameter parameter) {
