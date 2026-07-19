@@ -47,6 +47,57 @@ public class QueryBuilderService {
     }
 
     /**
+     * Rejects any filter or sort field that the response type does not declare,
+     * so clients can only filter and order by fields they can see in the
+     * response body. Must run on the client-provided sort, before
+     * {@link #ensureIdTieBreaker} appends the internal id tie-breaker.
+     */
+    public void validateFieldsAgainstResponse(Class<?> responseType, String filterQuery, String orderingQuery) {
+        try {
+            if (filterQuery != null && !filterQuery.isEmpty()) {
+                checkFilterFields(decodeAndDeserialize(filterQuery), responseType);
+            }
+            if (orderingQuery != null && !orderingQuery.isEmpty()) {
+                JsonNode root = decodeAndDeserialize(orderingQuery);
+                if (root.isObject()) {
+                    root.fieldNames().forEachRemaining(fieldName -> checkResponseField(responseType, fieldName));
+                }
+            }
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    private void checkFilterFields(JsonNode node, Class<?> responseType) {
+        if (!node.isObject()) {
+            return;
+        }
+        node.fields().forEachRemaining(entry -> {
+            if (entry.getKey().startsWith("$")) {
+                JsonNode value = entry.getValue();
+                if (value.isArray()) {
+                    value.forEach(item -> checkFilterFields(item, responseType));
+                } else {
+                    checkFilterFields(value, responseType);
+                }
+            } else {
+                checkResponseField(responseType, entry.getKey());
+            }
+        });
+    }
+
+    private void checkResponseField(Class<?> responseType, String fieldName) {
+        try {
+            FieldUtils.findField(responseType, fieldName);
+        } catch (NoSuchFieldException e) {
+            throw new UnknownResponseFieldException(
+                    "Cannot filter or order by '" + fieldName + "': the response does not contain this field");
+        }
+    }
+
+    /**
      * Appends {"id": 1} to the sort specification when "id" is not already present,
      * so that the ordering is total and keyset pagination never skips or repeats rows.
      */

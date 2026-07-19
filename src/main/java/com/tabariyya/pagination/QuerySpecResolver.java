@@ -11,7 +11,10 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.stereotype.Component;
 
+import org.springframework.http.ResponseEntity;
+
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Collection;
 import java.util.Map;
 
 @Component
@@ -69,6 +72,7 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             filter = request.getParameter("filters");
             sort = request.getParameter("ordering");
             size = parseSize(request.getParameter("size"));
+            queryBuilderService.validateFieldsAgainstResponse(resolveResponseType(parameter, entity), filter, sort);
         }
 
         if (sort == null || sort.isEmpty()) {
@@ -110,6 +114,31 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid size parameter", e);
         }
+    }
+
+    /**
+     * Resolves the element type of the handler's response body
+     * (ResponseEntity&lt;List&lt;T&gt;&gt; or List&lt;T&gt;), which is what filter
+     * and sort fields are validated against. Falls back to the entity when the
+     * return type is not a list.
+     */
+    private Class<?> resolveResponseType(MethodParameter parameter, Class<?> entity) {
+        if (parameter.getMethod() == null) {
+            return entity;
+        }
+        ResolvableType returnType = ResolvableType.forMethodReturnType(parameter.getMethod(), parameter.getContainingClass());
+        Class<?> raw = returnType.resolve();
+        if (raw != null && ResponseEntity.class.isAssignableFrom(raw)) {
+            returnType = returnType.getGeneric(0);
+            raw = returnType.resolve();
+        }
+        if (raw != null && Collection.class.isAssignableFrom(raw)) {
+            Class<?> elementType = returnType.getGeneric(0).resolve();
+            if (elementType != null) {
+                return elementType;
+            }
+        }
+        return entity;
     }
 
     private Class<?> resolveGenericType(MethodParameter parameter) {

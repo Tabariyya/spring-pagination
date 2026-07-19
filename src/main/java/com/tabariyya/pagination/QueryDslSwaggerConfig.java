@@ -49,14 +49,14 @@ public class QueryDslSwaggerConfig {
 
             operation.addParametersItem(new Parameter()
                     .name("filters")
-                    .description("JSON-encoded filter criteria")
+                    .description("JSON-encoded filter criteria; only fields present in the response body are allowed")
                     .in("query")
                     .required(false)
                     .schema(new Schema<String>().type("string")));
 
             operation.addParametersItem(new Parameter()
                     .name("ordering")
-                    .description("JSON-encoded sort specification")
+                    .description("JSON-encoded sort specification; only fields present in the response body are allowed")
                     .in("query")
                     .required(false)
                     .schema(new Schema<String>().type("string")));

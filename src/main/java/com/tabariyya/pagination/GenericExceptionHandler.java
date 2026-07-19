@@ -26,6 +26,11 @@ public class GenericExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 
+    @ExceptionHandler(UnknownResponseFieldException.class)
+    public ResponseEntity<String> handleUnknownResponseFieldException(UnknownResponseFieldException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
     @ExceptionHandler(CursorParameterConflictException.class)
     public ResponseEntity<String> handleCursorParameterConflictException(CursorParameterConflictException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
