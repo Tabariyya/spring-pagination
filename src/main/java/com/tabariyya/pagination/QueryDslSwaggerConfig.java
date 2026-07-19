@@ -105,11 +105,11 @@ public class QueryDslSwaggerConfig {
                     return;
                 }
                 Schema<Object> paginatedResult = new Schema<>().type("object");
-                paginatedResult.addProperty("count", new Schema<Long>().type("integer").format("int64")
-                        .description("Total rows matching the filter; only present on the first page"));
+                paginatedResult.addProperty("count", new Schema<Long>().type("integer").format("int64").nullable(true)
+                        .description("Total rows matching the filter; null on cursor requests"));
                 paginatedResult.addProperty("result", schema);
-                paginatedResult.addProperty("nextCursor", new Schema<String>().type("string")
-                        .description("Cursor for the next page; absent when there are no further pages"));
+                paginatedResult.addProperty("nextCursor", new Schema<String>().type("string").nullable(true)
+                        .description("Cursor for the next page; null when there are no further pages"));
                 mediaType.setSchema(paginatedResult);
             });
 
