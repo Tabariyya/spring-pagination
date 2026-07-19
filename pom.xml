@@ -6,15 +6,15 @@
 
     <groupId>com.tabariyya</groupId>
     <artifactId>spring-pagination</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <packaging>jar</packaging>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring.version>5.3.39</spring.version>
-        <querydsl.version>5.0.0</querydsl.version>
+        <spring.version>6.2.8</spring.version>
+        <querydsl.version>5.1.0</querydsl.version>
     </properties>
 
     <name>spring-pagination</name>
@@ -69,11 +69,18 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- QueryDSL JPA (javax.persistence variant, no jakarta classifier) -->
+        <!-- QueryDSL JPA (jakarta variant, matching Spring Boot 3+/Framework 6+ consumers) -->
         <dependency>
             <groupId>com.querydsl</groupId>
             <artifactId>querydsl-jpa</artifactId>
             <version>${querydsl.version}</version>
+            <classifier>jakarta</classifier>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>3.1.0</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.querydsl</groupId>
@@ -94,13 +101,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.0.1</version>
         </dependency>
-        <!-- Reflections (for subtype scanning in QuerySpecResolver) -->
-        <dependency>
-            <groupId>org.reflections</groupId>
-            <artifactId>reflections</artifactId>
-            <version>0.10.2</version>
-        </dependency>
-
 
         <dependency>
             <groupId>com.tabariyya</groupId>
