@@ -43,6 +43,7 @@ public class PaginationResponseAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        return new PaginatedResult<>(querySpec.getCount(), results, querySpec.getNextCursor());
+        return new PaginatedResult<>(querySpec.getCount(), results, querySpec.getNextCursor(),
+                querySpec.getAggregationResults());
     }
 }

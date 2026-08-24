@@ -46,6 +46,16 @@ public class QueryBuilderService {
         }
     }
 
+    public AggregationSpec buildAggregations(Class<?> entity, String query) {
+        try {
+            return aggregationBuilder(entity, query);
+        } catch (InvalidAggregationException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
     /**
      * Rejects any filter or sort field that the response type does not declare,
      * so clients can only filter and order by fields they can see in the
@@ -68,6 +78,36 @@ public class QueryBuilderService {
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
         }
+    }
+
+    public void validateAggregationsAgainstResponse(Class<?> responseType, String aggregationQuery) {
+        if (aggregationQuery == null || aggregationQuery.isEmpty()) {
+            return;
+        }
+        try {
+            JsonNode root = decodeAndDeserialize(aggregationQuery);
+            if (!root.isObject()) {
+                return;
+            }
+            root.fields().forEachRemaining(entry -> {
+                String fieldName = aggregatedFieldName(entry.getValue());
+                if (fieldName != null) {
+                    checkResponseField(responseType, fieldName);
+                }
+            });
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    private String aggregatedFieldName(JsonNode accumulator) {
+        if (!accumulator.isObject() || accumulator.size() != 1) {
+            return null;
+        }
+        JsonNode operand = accumulator.fields().next().getValue();
+        return operand.isTextual() ? stripFieldPrefix(operand.asText()) : null;
     }
 
     private void checkFilterFields(JsonNode node, Class<?> responseType) {
@@ -168,6 +208,111 @@ public class QueryBuilderService {
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
         }
+    }
+
+    private AggregationSpec aggregationBuilder(Class<?> entity, String query) throws Throwable {
+        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        JsonNode root = decodeAndDeserialize(query);
+
+        if (!root.isObject()) {
+            throw new InvalidAggregationException("Aggregation specification must be a JSON object");
+        }
+
+        List<Aggregation<?>> aggregations = new ArrayList<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> entry = fields.next();
+            aggregations.add(buildAggregation(entry.getKey(), entry.getValue(), pathBuilder, entity));
+        }
+
+        return aggregations.isEmpty() ? AggregationSpec.EMPTY : new AggregationSpec(aggregations);
+    }
+
+    private Aggregation<?> buildAggregation(String alias, JsonNode accumulator,
+                                            PathBuilder<?> pathBuilder, Class<?> entityClass) throws NoSuchFieldException {
+        if (alias.isEmpty() || alias.startsWith("$")) {
+            throw new InvalidAggregationException("Invalid aggregation alias '" + alias
+                    + "': aliases are the names the results are reported under and must not start with '$'");
+        }
+        if (!accumulator.isObject() || accumulator.size() != 1) {
+            throw new InvalidAggregationException("Aggregation '" + alias
+                    + "' must be an object holding exactly one accumulator, for example {\"$sum\": \"$score\"}");
+        }
+
+        Map.Entry<String, JsonNode> entry = accumulator.fields().next();
+        AggregateFunction function = AggregateFunction.of(entry.getKey());
+        JsonNode operand = entry.getValue();
+
+        if (function == AggregateFunction.COUNT) {
+            if (!operand.isNull() && !(operand.isObject() && operand.isEmpty())) {
+                throw new InvalidAggregationException("Aggregation '" + alias
+                        + "': $count counts rows and takes no field; write {\"$count\": {}},"
+                        + " or $countDistinct to count the distinct values of a field");
+            }
+            return AggregateExpressions.count(alias);
+        }
+        if (function == AggregateFunction.SUM && operand.isNumber()) {
+            if (!operand.isIntegralNumber() || operand.asInt() != 1) {
+                throw new InvalidAggregationException("Aggregation '" + alias
+                        + "': {\"$sum\": 1} is the only literal sum supported; sum a field with {\"$sum\": \"$field\"}");
+            }
+            return AggregateExpressions.count(alias);
+        }
+
+        String fieldName = fieldReference(alias, function, operand);
+        Class<?> fieldType = AggregateExpressions.box(FieldUtils.findField(entityClass, fieldName).getType());
+
+        switch (function) {
+            case SUM:
+                return AggregateExpressions.sum(alias, pathBuilder, fieldName,
+                        requireNumeric(alias, function, fieldName, fieldType));
+            case AVG:
+                return AggregateExpressions.avg(alias, pathBuilder, fieldName,
+                        requireNumeric(alias, function, fieldName, fieldType));
+            case MIN:
+                return AggregateExpressions.extremum(alias, Ops.AggOps.MIN_AGG, pathBuilder, fieldName,
+                        requireComparable(alias, function, fieldName, fieldType));
+            case MAX:
+                return AggregateExpressions.extremum(alias, Ops.AggOps.MAX_AGG, pathBuilder, fieldName,
+                        requireComparable(alias, function, fieldName, fieldType));
+            case COUNT_DISTINCT:
+                return AggregateExpressions.countDistinct(alias, pathBuilder, fieldName);
+            default:
+                throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
+        }
+    }
+
+    private static String fieldReference(String alias, AggregateFunction function, JsonNode operand) {
+        if (!operand.isTextual()) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a field reference such as \"$fieldName\"");
+        }
+        String fieldName = stripFieldPrefix(operand.asText());
+        if (fieldName.isEmpty()) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a non-empty field reference");
+        }
+        return fieldName;
+    }
+
+    private static String stripFieldPrefix(String reference) {
+        return reference.startsWith("$") ? reference.substring(1) : reference;
+    }
+
+    private static Class<?> requireNumeric(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+        if (!Number.class.isAssignableFrom(fieldType) || !Comparable.class.isAssignableFrom(fieldType)) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a numeric field, but '" + fieldName + "' is " + fieldType.getSimpleName());
+        }
+        return fieldType;
+    }
+
+    private static Class<?> requireComparable(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+        if (!Comparable.class.isAssignableFrom(fieldType)) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a comparable field, but '" + fieldName + "' is " + fieldType.getSimpleName());
+        }
+        return fieldType;
     }
 
     private OrderSpecifier<?>[] orderSpecifierBuilder(Class<?> entity, String query) throws Throwable {

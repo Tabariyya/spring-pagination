@@ -62,6 +62,16 @@ public class QueryDslSwaggerConfig {
                     .schema(new Schema<String>().type("string")));
 
             operation.addParametersItem(new Parameter()
+                    .name("aggregations")
+                    .description("JSON-encoded aggregates over the whole filtered set, keyed by the alias to report each "
+                            + "under, e.g. {\"total\":{\"$sum\":\"$score\"},\"average\":{\"$avg\":\"$score\"},"
+                            + "\"rows\":{\"$count\":{}}}; supports $sum, $avg, $min, $max, $count and $countDistinct, "
+                            + "and only fields present in the response body are allowed")
+                    .in("query")
+                    .required(false)
+                    .schema(new Schema<String>().type("string")));
+
+            operation.addParametersItem(new Parameter()
                     .name("size")
                     .description("Page size (integer)")
                     .in("query")
@@ -110,6 +120,10 @@ public class QueryDslSwaggerConfig {
                 paginatedResult.addProperty("result", schema);
                 paginatedResult.addProperty("nextCursor", new Schema<String>().type("string").nullable(true)
                         .description("Cursor for the next page; null when there are no further pages"));
+                paginatedResult.addProperty("aggregations", new Schema<Object>().type("object")
+                        .additionalProperties(Boolean.TRUE)
+                        .description("Requested aggregates over the whole filtered set, keyed by alias; "
+                                + "absent when none were requested and on cursor requests"));
                 mediaType.setSchema(paginatedResult);
             });
 

@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -24,9 +26,12 @@ public class QuerySpec<TEntity> {
     private Class<?> entityClass;
     private String filters;
     private String ordering;
+    private String aggregations;
+    private AggregationSpec aggregationSpec = AggregationSpec.EMPTY;
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
+    private Map<String, Object> aggregationResults;
 
     /**
      * Applies the ordering and limit to the given query, fetches the page and
@@ -37,6 +42,10 @@ public class QuerySpec<TEntity> {
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
+        if (!cursorRequest && !aggregationSpec.isEmpty()) {
+            aggregationResults = fetchAggregations(query);
+        }
+
         query.orderBy(orderSpecifiers).limit(limit);
 
         if (cursorRequest) {
@@ -58,12 +67,21 @@ public class QuerySpec<TEntity> {
         return rows;
     }
 
+    private Map<String, Object> fetchAggregations(JPAQuery<TEntity> query) {
+        Tuple tuple = query.clone().select(aggregationSpec.expressions()).fetchOne();
+        return tuple == null ? Collections.emptyMap() : aggregationSpec.read(tuple);
+    }
+
     /**
      * Total count of rows matching the filter, set by {@link #fetchPage} on the
      * first request; null on cursor requests.
      */
     public Long getCount() {
         return count;
+    }
+
+    public Map<String, Object> getAggregationResults() {
+        return aggregationResults;
     }
 
     /**
@@ -114,6 +132,20 @@ public class QuerySpec<TEntity> {
     }
     public void setOrdering(String ordering) {
         this.ordering = ordering;
+    }
+
+    public String getAggregations() {
+        return aggregations;
+    }
+    public void setAggregations(String aggregations) {
+        this.aggregations = aggregations;
+    }
+
+    public AggregationSpec getAggregationSpec() {
+        return aggregationSpec;
+    }
+    public void setAggregationSpec(AggregationSpec aggregationSpec) {
+        this.aggregationSpec = aggregationSpec == null ? AggregationSpec.EMPTY : aggregationSpec;
     }
 
     public boolean isCursorRequest() {
