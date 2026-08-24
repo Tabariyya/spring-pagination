@@ -338,6 +338,16 @@ public class QueryBuilderService {
             );
         }
 
+        if ("$similar".equals(operatorKey)) {
+            String term = valueNode.asText();
+
+            return Expressions.booleanTemplate(
+                    "function('trgm_similar', {0}, {1}) = true",
+                    pathBuilder.get(fieldName),
+                    ConstantImpl.create(term)
+            );
+        }
+
         Ops queryDslOp = mapMongoOperator(operatorKey);
 
         if (queryDslOp == Ops.IN || queryDslOp == Ops.NOT_IN) {
