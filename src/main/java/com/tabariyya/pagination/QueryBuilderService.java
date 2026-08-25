@@ -384,6 +384,7 @@ public class QueryBuilderService {
             case "$lte": return Ops.LOE;
             case "$in": return Ops.IN;
             case "$nin": return Ops.NOT_IN;
+            case "$contains": return Ops.STRING_CONTAINS_IC;
             default: throw new IllegalArgumentException("Unsupported operator: " + mongoOp);
         }
     }
