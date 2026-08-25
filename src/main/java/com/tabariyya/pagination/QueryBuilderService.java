@@ -332,7 +332,7 @@ public class QueryBuilderService {
             String regex = valueNode.asText();
 
             return Expressions.booleanTemplate(
-                    "function('regexp_match', {0}, {1}) is not null",
+                    "function('regex_matches_ic', {0}, {1}) = true",
                     pathBuilder.get(fieldName),
                     ConstantImpl.create(regex)
             );
