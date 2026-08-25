@@ -6,16 +6,18 @@ public class Cursor {
     private String filters;
     private String ordering;
     private String aggregations;
+    private String groupBy;
     private Integer size;
     private Map<String, Object> lastValues;
 
     public Cursor() {
     }
 
-    public Cursor(String filters, String ordering, String aggregations, Integer size, Map<String, Object> lastValues) {
+    public Cursor(String filters, String ordering, String aggregations, String groupBy, Integer size, Map<String, Object> lastValues) {
         this.filters = filters;
         this.ordering = ordering;
         this.aggregations = aggregations;
+        this.groupBy = groupBy;
         this.size = size;
         this.lastValues = lastValues;
     }
@@ -39,6 +41,13 @@ public class Cursor {
     }
     public void setAggregations(String aggregations) {
         this.aggregations = aggregations;
+    }
+
+    public String getGroupBy() {
+        return groupBy;
+    }
+    public void setGroupBy(String groupBy) {
+        this.groupBy = groupBy;
     }
 
     public Integer getSize() {

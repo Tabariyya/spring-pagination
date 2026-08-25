@@ -31,6 +31,10 @@ final class AggregateExpressions {
         return type.isPrimitive() ? BOXED_PRIMITIVES.get(type) : type;
     }
 
+    static <T> GroupKey<T> groupKey(PathBuilder<?> pathBuilder, String fieldName, Class<T> fieldType) {
+        return new GroupKey<>(fieldName, fieldType, pathBuilder.getSimple(fieldName, fieldType));
+    }
+
     static Aggregation<Long> count(String alias) {
         return new Aggregation<>(alias, Long.class,
                 Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_ALL_AGG));

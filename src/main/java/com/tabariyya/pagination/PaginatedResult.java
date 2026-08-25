@@ -12,9 +12,14 @@ import java.util.Map;
  * further page.
  */
 public record PaginatedResult<T>(Long count, List<T> result, String nextCursor,
-                                 @JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> aggregations) {
+                                 @JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> aggregations,
+                                 @JsonInclude(JsonInclude.Include.NON_NULL) List<Group> groups) {
 
     public PaginatedResult(Long count, List<T> result, String nextCursor) {
-        this(count, result, nextCursor, null);
+        this(count, result, nextCursor, null, null);
+    }
+
+    public PaginatedResult(Long count, List<T> result, String nextCursor, Map<String, Object> aggregations) {
+        this(count, result, nextCursor, aggregations, null);
     }
 }

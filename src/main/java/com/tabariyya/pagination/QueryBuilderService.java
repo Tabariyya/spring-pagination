@@ -80,6 +80,33 @@ public class QueryBuilderService {
         }
     }
 
+    public GroupBySpec buildGroupBy(Class<?> entity, String query) {
+        try {
+            return groupByBuilder(entity, query);
+        } catch (InvalidAggregationException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    public void validateGroupByAgainstResponse(Class<?> responseType, String groupByQuery) {
+        if (groupByQuery == null || groupByQuery.isEmpty()) {
+            return;
+        }
+        try {
+            for (String fieldName : groupByFieldNames(groupByQuery)) {
+                checkResponseField(responseType, fieldName);
+            }
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (InvalidAggregationException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
     public void validateAggregationsAgainstResponse(Class<?> responseType, String aggregationQuery) {
         if (aggregationQuery == null || aggregationQuery.isEmpty()) {
             return;
@@ -208,6 +235,61 @@ public class QueryBuilderService {
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
         }
+    }
+
+    private GroupBySpec groupByBuilder(Class<?> entity, String query) throws Throwable {
+        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        List<String> fieldNames = groupByFieldNames(query);
+
+        if (fieldNames.isEmpty()) {
+            throw new InvalidAggregationException("Group by must name at least one field");
+        }
+
+        List<GroupKey<?>> keys = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String fieldName : fieldNames) {
+            if (!seen.add(fieldName)) {
+                throw new InvalidAggregationException("Group by names '" + fieldName + "' more than once");
+            }
+            Class<?> fieldType = AggregateExpressions.box(FieldUtils.findField(entity, fieldName).getType());
+            keys.add(AggregateExpressions.groupKey(pathBuilder, fieldName, fieldType));
+        }
+
+        return new GroupBySpec(keys);
+    }
+
+    private List<String> groupByFieldNames(String query) throws Exception {
+        String decoded = URLDecoder.decode(query, StandardCharsets.UTF_8.name()).trim();
+        List<String> fieldNames = new ArrayList<>();
+
+        if (decoded.startsWith("[") || decoded.startsWith("\"")) {
+            JsonNode root = objectMapper.readTree(decoded);
+            if (root.isTextual()) {
+                fieldNames.add(stripFieldPrefix(root.asText().trim()));
+            } else if (root.isArray()) {
+                for (JsonNode element : root) {
+                    if (!element.isTextual()) {
+                        throw new InvalidAggregationException(
+                                "Group by array must hold field names as strings, for example [\"score\"]");
+                    }
+                    fieldNames.add(stripFieldPrefix(element.asText().trim()));
+                }
+            } else {
+                throw new InvalidAggregationException(
+                        "Group by must be a field name or an array of field names");
+            }
+        } else {
+            for (String part : decoded.split(",", -1)) {
+                fieldNames.add(stripFieldPrefix(part.trim()));
+            }
+        }
+
+        for (String fieldName : fieldNames) {
+            if (fieldName.isEmpty()) {
+                throw new InvalidAggregationException("Group by contains an empty field name");
+            }
+        }
+        return fieldNames;
     }
 
     private AggregationSpec aggregationBuilder(Class<?> entity, String query) throws Throwable {

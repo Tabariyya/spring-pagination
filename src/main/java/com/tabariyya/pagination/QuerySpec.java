@@ -2,6 +2,7 @@ package com.tabariyya.pagination;
 
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.EntityPath;
+import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.Expressions;
@@ -28,10 +29,15 @@ public class QuerySpec<TEntity> {
     private String ordering;
     private String aggregations;
     private AggregationSpec aggregationSpec = AggregationSpec.EMPTY;
+    private String groupBy;
+    private GroupBySpec groupBySpec = GroupBySpec.EMPTY;
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
     private Map<String, Object> aggregationResults;
+    private List<Group> groups;
+
+    private static final int MAX_GROUPS = 1000;
 
     /**
      * Applies the ordering and limit to the given query, fetches the page and
@@ -42,8 +48,12 @@ public class QuerySpec<TEntity> {
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
-        if (!cursorRequest && !aggregationSpec.isEmpty()) {
-            aggregationResults = fetchAggregations(query);
+        if (!cursorRequest) {
+            if (!groupBySpec.isEmpty()) {
+                groups = fetchGroups(query);
+            } else if (!aggregationSpec.isEmpty()) {
+                aggregationResults = fetchAggregations(query);
+            }
         }
 
         query.orderBy(orderSpecifiers).limit(limit);
@@ -72,6 +82,32 @@ public class QuerySpec<TEntity> {
         return tuple == null ? Collections.emptyMap() : aggregationSpec.read(tuple);
     }
 
+    private List<Group> fetchGroups(JPAQuery<TEntity> query) {
+        Expression<?>[] keyExpressions = groupBySpec.expressions();
+        Expression<?>[] valueExpressions = aggregationSpec.expressions();
+        Expression<?>[] projection = new Expression<?>[keyExpressions.length + valueExpressions.length];
+        System.arraycopy(keyExpressions, 0, projection, 0, keyExpressions.length);
+        System.arraycopy(valueExpressions, 0, projection, keyExpressions.length, valueExpressions.length);
+
+        List<Tuple> tuples = query.clone()
+                .select(projection)
+                .groupBy(keyExpressions)
+                .orderBy(groupBySpec.ordering())
+                .limit(MAX_GROUPS + 1L)
+                .fetch();
+
+        if (tuples.size() > MAX_GROUPS) {
+            throw new InvalidAggregationException("Group by produced more than " + MAX_GROUPS
+                    + " groups; narrow the filter or group by fewer fields");
+        }
+
+        List<Group> fetched = new ArrayList<>(tuples.size());
+        for (Tuple tuple : tuples) {
+            fetched.add(new Group(groupBySpec.read(tuple), aggregationSpec.read(tuple)));
+        }
+        return fetched;
+    }
+
     /**
      * Total count of rows matching the filter, set by {@link #fetchPage} on the
      * first request; null on cursor requests.
@@ -82,6 +118,10 @@ public class QuerySpec<TEntity> {
 
     public Map<String, Object> getAggregationResults() {
         return aggregationResults;
+    }
+
+    public List<Group> getGroups() {
+        return groups;
     }
 
     /**
@@ -146,6 +186,20 @@ public class QuerySpec<TEntity> {
     }
     public void setAggregationSpec(AggregationSpec aggregationSpec) {
         this.aggregationSpec = aggregationSpec == null ? AggregationSpec.EMPTY : aggregationSpec;
+    }
+
+    public String getGroupBy() {
+        return groupBy;
+    }
+    public void setGroupBy(String groupBy) {
+        this.groupBy = groupBy;
+    }
+
+    public GroupBySpec getGroupBySpec() {
+        return groupBySpec;
+    }
+    public void setGroupBySpec(GroupBySpec groupBySpec) {
+        this.groupBySpec = groupBySpec == null ? GroupBySpec.EMPTY : groupBySpec;
     }
 
     public boolean isCursorRequest() {

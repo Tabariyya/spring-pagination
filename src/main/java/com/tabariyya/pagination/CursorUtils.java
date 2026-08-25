@@ -40,7 +40,7 @@ public final class CursorUtils {
             }
 
             Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(),
-                    querySpec.getAggregations(), querySpec.getLimit(), lastValues);
+                    querySpec.getAggregations(), querySpec.getGroupBy(), querySpec.getLimit(), lastValues);
             byte[] json = objectMapper.writeValueAsBytes(cursor);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
         } catch (Throwable e) {
