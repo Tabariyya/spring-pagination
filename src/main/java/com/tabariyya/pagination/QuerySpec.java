@@ -13,9 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Component
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -26,15 +24,9 @@ public class QuerySpec<TEntity> {
     private Class<?> entityClass;
     private String filters;
     private String ordering;
-    private String aggregations;
-    private AggregationSpec aggregationSpec = AggregationSpec.EMPTY;
-    private String groupBy;
-    private GroupBySpec groupBySpec = GroupBySpec.EMPTY;
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
-    private Map<String, Object> aggregationResults;
-    private List<Group> groups;
 
     /**
      * Applies the ordering and limit to the given query, fetches the page and
@@ -45,15 +37,6 @@ public class QuerySpec<TEntity> {
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
-        if (!cursorRequest) {
-            AggregationQuery aggregationQuery = AggregationQuery.of(aggregationSpec, groupBySpec);
-            if (aggregationQuery.isGrouped()) {
-                groups = aggregationQuery.fetchGroups(query);
-            } else if (!aggregationQuery.isEmpty()) {
-                aggregationResults = aggregationQuery.fetch(query);
-            }
-        }
-
         query.orderBy(orderSpecifiers).limit(limit);
 
         if (cursorRequest) {
@@ -81,14 +64,6 @@ public class QuerySpec<TEntity> {
      */
     public Long getCount() {
         return count;
-    }
-
-    public Map<String, Object> getAggregationResults() {
-        return aggregationResults;
-    }
-
-    public List<Group> getGroups() {
-        return groups;
     }
 
     /**
@@ -139,34 +114,6 @@ public class QuerySpec<TEntity> {
     }
     public void setOrdering(String ordering) {
         this.ordering = ordering;
-    }
-
-    public String getAggregations() {
-        return aggregations;
-    }
-    public void setAggregations(String aggregations) {
-        this.aggregations = aggregations;
-    }
-
-    public AggregationSpec getAggregationSpec() {
-        return aggregationSpec;
-    }
-    public void setAggregationSpec(AggregationSpec aggregationSpec) {
-        this.aggregationSpec = aggregationSpec == null ? AggregationSpec.EMPTY : aggregationSpec;
-    }
-
-    public String getGroupBy() {
-        return groupBy;
-    }
-    public void setGroupBy(String groupBy) {
-        this.groupBy = groupBy;
-    }
-
-    public GroupBySpec getGroupBySpec() {
-        return groupBySpec;
-    }
-    public void setGroupBySpec(GroupBySpec groupBySpec) {
-        this.groupBySpec = groupBySpec == null ? GroupBySpec.EMPTY : groupBySpec;
     }
 
     public boolean isCursorRequest() {

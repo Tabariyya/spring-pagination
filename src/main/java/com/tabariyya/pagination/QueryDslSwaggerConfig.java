@@ -62,6 +62,36 @@ public class QueryDslSwaggerConfig {
                     .schema(new Schema<String>().type("string")));
 
             operation.addParametersItem(new Parameter()
+                    .name("size")
+                    .description("Page size (integer)")
+                    .in("query")
+                    .required(false)
+                    .schema(new Schema<Integer>().type("integer")));
+
+            operation.addParametersItem(new Parameter()
+                    .name("cursor")
+                    .description("Opaque cursor returned by the previous page; when present, filters/ordering/size are ignored")
+                    .in("query")
+                    .required(false)
+                    .schema(new Schema<String>().type("string")));
+
+            return operation;
+        };
+    }
+
+
+    @Bean
+    public OperationCustomizer aggregationParamsCustomizer() {
+        return (Operation operation, HandlerMethod handlerMethod) -> {
+
+            boolean hasAggregationParam = Arrays.stream(handlerMethod.getMethodParameters())
+                    .anyMatch(p -> AggregationRequest.class.isAssignableFrom(p.getParameterType()));
+
+            if (!hasAggregationParam) {
+                return operation;
+            }
+
+            operation.addParametersItem(new Parameter()
                     .name("aggregations")
                     .description("JSON-encoded aggregates over the whole filtered set, keyed by the alias to report each "
                             + "under, e.g. {\"total\":{\"$sum\":\"$score\"},\"average\":{\"$avg\":\"$score\"},"
@@ -81,19 +111,25 @@ public class QueryDslSwaggerConfig {
                     .required(false)
                     .schema(new Schema<String>().type("string")));
 
-            operation.addParametersItem(new Parameter()
-                    .name("size")
-                    .description("Page size (integer)")
-                    .in("query")
-                    .required(false)
-                    .schema(new Schema<Integer>().type("integer")));
+            return operation;
+        };
+    }
 
-            operation.addParametersItem(new Parameter()
-                    .name("cursor")
-                    .description("Opaque cursor returned by the previous page; when present, filters/ordering/size are ignored")
-                    .in("query")
-                    .required(false)
-                    .schema(new Schema<String>().type("string")));
+    @Bean
+    public OperationCustomizer hideAggregationRequestByType() {
+        return (Operation operation, HandlerMethod handlerMethod) -> {
+            Class<?>[] parameterTypes = handlerMethod.getMethod().getParameterTypes();
+            List<Parameter> swaggerParams = operation.getParameters();
+
+            if (swaggerParams != null) {
+                IntStream.range(0, parameterTypes.length)
+                        .filter(i -> AggregationRequest.class.isAssignableFrom(parameterTypes[i]))
+                        .forEach(index -> {
+                            if (index < swaggerParams.size()) {
+                                swaggerParams.remove(index);
+                            }
+                        });
+            }
 
             return operation;
         };

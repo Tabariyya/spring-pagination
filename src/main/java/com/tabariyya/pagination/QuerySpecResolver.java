@@ -52,45 +52,31 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
 
         String filter;
         String sort;
-        String aggregations;
-        String groupBy;
         Integer size;
         Map<String, Object> lastValues = null;
-        boolean cursorRequest = cursorToken != null && !cursorToken.isEmpty();
 
-        if (cursorRequest) {
+        if (cursorToken != null && !cursorToken.isEmpty()) {
             if (request.getParameter("filters") != null
                     || request.getParameter("ordering") != null
-                    || request.getParameter("aggregations") != null
-                    || request.getParameter("groupBy") != null
                     || request.getParameter("size") != null) {
                 throw new CursorParameterConflictException(
-                        "filters, ordering, aggregations, groupBy and size are not allowed together with a cursor; they are carried by the cursor itself");
+                        "filters, ordering and size are not allowed together with a cursor; they are carried by the cursor itself");
             }
             Cursor cursor = CursorUtils.decode(cursorToken);
             filter = cursor.getFilters();
             sort = cursor.getOrdering();
-            aggregations = cursor.getAggregations();
-            groupBy = cursor.getGroupBy();
             size = cursor.getSize();
             lastValues = cursor.getLastValues();
             querySpec.setCursorRequest(true);
         } else {
             filter = request.getParameter("filters");
             sort = request.getParameter("ordering");
-            aggregations = request.getParameter("aggregations");
-            groupBy = request.getParameter("groupBy");
             size = parseSize(request.getParameter("size"));
-            Class<?> responseType = resolveResponseType(parameter, entity);
-            queryBuilderService.validateFieldsAgainstResponse(responseType, filter, sort);
-            queryBuilderService.validateAggregationsAgainstResponse(responseType, aggregations);
-            queryBuilderService.validateGroupByAgainstResponse(responseType, groupBy);
+            queryBuilderService.validateFieldsAgainstResponse(resolveResponseType(parameter, entity), filter, sort);
         }
 
         if (sort == null || sort.isEmpty()) {
-            sort = """
-                    {"id": 1}
-                    """;
+            sort = "{\"id\":1}";
         }
         sort = queryBuilderService.ensureIdTieBreaker(sort);
 
@@ -109,21 +95,10 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
         OrderSpecifier<?>[] orderSpecifiers = queryBuilderService.buildOrderSpecifier(entity, sort);
         querySpec.setOrderingQuery(orderSpecifiers);
 
-        if (!cursorRequest) {
-            if (aggregations != null && !aggregations.isEmpty()) {
-                querySpec.setAggregationSpec(queryBuilderService.buildAggregations(entity, aggregations));
-            }
-            if (groupBy != null && !groupBy.isEmpty()) {
-                querySpec.setGroupBySpec(queryBuilderService.buildGroupBy(entity, groupBy));
-            }
-        }
-
         querySpec.setLimit(size);
         querySpec.setEntityClass(entity);
         querySpec.setFilters(filter);
         querySpec.setOrdering(sort);
-        querySpec.setAggregations(aggregations);
-        querySpec.setGroupBy(groupBy);
 
         request.setAttribute(QuerySpec.class.getName(), querySpec);
 

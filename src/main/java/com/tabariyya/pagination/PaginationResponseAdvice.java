@@ -11,6 +11,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Wraps the result list of every request that resolved a {@link QuerySpec} into
@@ -38,12 +39,23 @@ public class PaginationResponseAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        Object attribute = requestAttributes.getAttribute(QuerySpec.class.getName(), RequestAttributes.SCOPE_REQUEST);
-        if (!(attribute instanceof QuerySpec<?> querySpec)) {
+        Object querySpecAttribute =
+                requestAttributes.getAttribute(QuerySpec.class.getName(), RequestAttributes.SCOPE_REQUEST);
+        Object aggregationAttribute =
+                requestAttributes.getAttribute(AggregationRequest.class.getName(), RequestAttributes.SCOPE_REQUEST);
+
+        if (!(querySpecAttribute instanceof QuerySpec<?> querySpec)) {
             return body;
         }
 
-        return new PaginatedResult<>(querySpec.getCount(), results, querySpec.getNextCursor(),
-                querySpec.getAggregationResults(), querySpec.getGroups());
+        Map<String, Object> values = null;
+        List<Group> groups = null;
+        if (aggregationAttribute instanceof AggregationRequest<?> aggregationRequest) {
+            values = aggregationRequest.getValues();
+            groups = aggregationRequest.getGroups();
+        }
+
+        return new PaginatedResult<>(
+                querySpec.getCount(), results, querySpec.getNextCursor(), values, groups);
     }
 }
