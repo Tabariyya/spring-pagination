@@ -251,8 +251,7 @@ public class QueryBuilderService {
             if (!seen.add(fieldName)) {
                 throw new InvalidAggregationException("Group by names '" + fieldName + "' more than once");
             }
-            Class<?> fieldType = AggregateExpressions.box(FieldUtils.findField(entity, fieldName).getType());
-            keys.add(AggregateExpressions.groupKey(pathBuilder, fieldName, fieldType));
+            keys.add(AggregateExpressions.key(entity, pathBuilder, fieldName));
         }
 
         return new GroupBySpec(keys);
@@ -342,26 +341,7 @@ public class QueryBuilderService {
         }
 
         String fieldName = fieldReference(alias, function, operand);
-        Class<?> fieldType = AggregateExpressions.box(FieldUtils.findField(entityClass, fieldName).getType());
-
-        switch (function) {
-            case SUM:
-                return AggregateExpressions.sum(alias, pathBuilder, fieldName,
-                        requireNumeric(alias, function, fieldName, fieldType));
-            case AVG:
-                return AggregateExpressions.avg(alias, pathBuilder, fieldName,
-                        requireNumeric(alias, function, fieldName, fieldType));
-            case MIN:
-                return AggregateExpressions.extremum(alias, Ops.AggOps.MIN_AGG, pathBuilder, fieldName,
-                        requireComparable(alias, function, fieldName, fieldType));
-            case MAX:
-                return AggregateExpressions.extremum(alias, Ops.AggOps.MAX_AGG, pathBuilder, fieldName,
-                        requireComparable(alias, function, fieldName, fieldType));
-            case COUNT_DISTINCT:
-                return AggregateExpressions.countDistinct(alias, pathBuilder, fieldName);
-            default:
-                throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
-        }
+        return AggregateExpressions.build(entityClass, pathBuilder, function, alias, fieldName);
     }
 
     private static String fieldReference(String alias, AggregateFunction function, JsonNode operand) {
@@ -381,21 +361,7 @@ public class QueryBuilderService {
         return reference.startsWith("$") ? reference.substring(1) : reference;
     }
 
-    private static Class<?> requireNumeric(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
-        if (!Number.class.isAssignableFrom(fieldType) || !Comparable.class.isAssignableFrom(fieldType)) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
-                    + " needs a numeric field, but '" + fieldName + "' is " + fieldType.getSimpleName());
-        }
-        return fieldType;
-    }
 
-    private static Class<?> requireComparable(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
-        if (!Comparable.class.isAssignableFrom(fieldType)) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
-                    + " needs a comparable field, but '" + fieldName + "' is " + fieldType.getSimpleName());
-        }
-        return fieldType;
-    }
 
     private OrderSpecifier<?>[] orderSpecifierBuilder(Class<?> entity, String query) throws Throwable {
         PathBuilder<?> pathBuilder = pathBuilderOf(entity);
@@ -625,21 +591,10 @@ public class QueryBuilderService {
         return matcher.find() ? matcher.group(1) : text;
     }
 
-    private Class<?> qClassOf(Class<?> entity) throws ClassNotFoundException {
-        String qClassName = entity.getPackage().getName() + ".Q" + entity.getSimpleName();
-        return Class.forName(qClassName);
-    }
 
-    private String instanceNameOf(Class<?> entity) {
-        String entityName = entity.getSimpleName();
-        return entityName.substring(0, 1).toLowerCase() + entityName.substring(1);
-    }
 
-    private PathBuilder<?> pathBuilderOf(Class<?> entity) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
-        String entityInstanceName = instanceNameOf(entity);
-        Class<?> qClass = qClassOf(entity);
-        EntityPath<?> entityPath = (EntityPath<?>) qClass.getField(entityInstanceName).get(null);
-        return new PathBuilder<>(entityPath.getType(), entityPath.getMetadata());
+    private PathBuilder<?> pathBuilderOf(Class<?> entity) {
+        return EntityPaths.of(entity);
     }
 
     private JsonNode decodeAndDeserialize(String query) throws Exception {

@@ -8,6 +8,8 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.PathBuilder;
 
+import java.lang.reflect.Field;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Map;
@@ -25,6 +27,56 @@ final class AggregateExpressions {
             boolean.class, Boolean.class);
 
     private AggregateExpressions() {
+    }
+
+    static Aggregation<?> build(Class<?> entity, PathBuilder<?> pathBuilder,
+                                AggregateFunction function, String alias, String fieldName) throws NoSuchFieldException {
+        if (function == AggregateFunction.COUNT) {
+            return count(alias);
+        }
+
+        Class<?> fieldType = fieldType(entity, fieldName);
+        switch (function) {
+            case SUM:
+                return sum(alias, pathBuilder, fieldName, requireNumeric(alias, function, fieldName, fieldType));
+            case AVG:
+                return avg(alias, pathBuilder, fieldName, requireNumeric(alias, function, fieldName, fieldType));
+            case MIN:
+                return extremum(alias, Ops.AggOps.MIN_AGG, pathBuilder, fieldName,
+                        requireComparable(alias, function, fieldName, fieldType));
+            case MAX:
+                return extremum(alias, Ops.AggOps.MAX_AGG, pathBuilder, fieldName,
+                        requireComparable(alias, function, fieldName, fieldType));
+            case COUNT_DISTINCT:
+                return countDistinct(alias, pathBuilder, fieldName);
+            default:
+                throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
+        }
+    }
+
+    static GroupKey<?> key(Class<?> entity, PathBuilder<?> pathBuilder, String fieldName) throws NoSuchFieldException {
+        return groupKey(pathBuilder, fieldName, fieldType(entity, fieldName));
+    }
+
+    static Class<?> fieldType(Class<?> entity, String fieldName) throws NoSuchFieldException {
+        Field field = FieldUtils.findField(entity, fieldName);
+        return box(field.getType());
+    }
+
+    static Class<?> requireNumeric(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+        if (!Number.class.isAssignableFrom(fieldType) || !Comparable.class.isAssignableFrom(fieldType)) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a numeric field, but '" + fieldName + "' is " + fieldType.getSimpleName());
+        }
+        return fieldType;
+    }
+
+    static Class<?> requireComparable(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+        if (!Comparable.class.isAssignableFrom(fieldType)) {
+            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+                    + " needs a comparable field, but '" + fieldName + "' is " + fieldType.getSimpleName());
+        }
+        return fieldType;
     }
 
     static Class<?> box(Class<?> type) {
