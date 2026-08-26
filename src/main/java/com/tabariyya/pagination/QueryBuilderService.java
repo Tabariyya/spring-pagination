@@ -525,7 +525,7 @@ public class QueryBuilderService {
             String regex = valueNode.asText();
 
             return Expressions.booleanTemplate(
-                    "function('regexp_match', {0}, {1}) is not null",
+                    "function('regex_matches_ic', {0}, {1}) = true",
                     pathBuilder.get(fieldName),
                     ConstantImpl.create(regex)
             );
@@ -577,6 +577,7 @@ public class QueryBuilderService {
             case "$lte": return Ops.LOE;
             case "$in": return Ops.IN;
             case "$nin": return Ops.NOT_IN;
+            case "$contains": return Ops.STRING_CONTAINS_IC;
             default: throw new IllegalArgumentException("Unsupported operator: " + mongoOp);
         }
     }
