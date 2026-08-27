@@ -121,9 +121,8 @@ public class QueryDslSwaggerConfig {
             operation.addParametersItem(new Parameter()
                     .name("groupBy")
                     .description("Field name, comma-separated list, or JSON array of field names to group by, "
-                            + "e.g. score or [\"score\",\"activityId\"]; the aggregations are then computed per "
-                            + "group and returned in groups[] instead of at the top level, and only fields present "
-                            + "in the response body are allowed")
+                            + "e.g. score or [\"score\",\"activityId\"]; the aggregates are then computed per group and the "
+                            + "endpoint returns a list of {key, values} groups instead of a single object")
                     .in("query")
                     .required(false)
                     .schema(new Schema<String>().type("string")));
@@ -163,18 +162,6 @@ public class QueryDslSwaggerConfig {
                 paginatedResult.addProperty("result", schema);
                 paginatedResult.addProperty("nextCursor", new Schema<String>().type("string").nullable(true)
                         .description("Cursor for the next page; null when there are no further pages"));
-                Schema<Object> group = new Schema<>().type("object");
-                group.addProperty("key", new Schema<Object>().type("object").additionalProperties(Boolean.TRUE)
-                        .description("The grouped field values identifying this group"));
-                group.addProperty("values", new Schema<Object>().type("object").additionalProperties(Boolean.TRUE)
-                        .description("The requested aggregates for this group, keyed by alias"));
-                paginatedResult.addProperty("groups", new Schema<Object>().type("array").items(group)
-                        .description("One entry per group when groupBy is used, ordered by the grouped fields; "
-                                + "absent otherwise and on cursor requests"));
-                paginatedResult.addProperty("aggregations", new Schema<Object>().type("object")
-                        .additionalProperties(Boolean.TRUE)
-                        .description("Requested aggregates over the whole filtered set, keyed by alias; "
-                                + "absent when none were requested and on cursor requests"));
                 mediaType.setSchema(paginatedResult);
             });
 

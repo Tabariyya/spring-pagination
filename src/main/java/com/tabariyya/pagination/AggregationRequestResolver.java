@@ -56,7 +56,6 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         boolean hasFilters = filters != null && !filters.isEmpty();
 
         if (!hasAggregations && !hasGroupBy && !hasFilters) {
-            request.setAttribute(AggregationRequest.class.getName(), aggregationRequest);
             return aggregationRequest;
         }
 
@@ -92,7 +91,6 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         aggregationRequest.setAggregationQuery(AggregationQuery.of(aggregationSpec, groupBySpec));
         aggregationRequest.setFilter(hasFilters ? queryBuilderService.buildFilter(entity, filters) : null);
-        request.setAttribute(AggregationRequest.class.getName(), aggregationRequest);
 
         return aggregationRequest;
     }
