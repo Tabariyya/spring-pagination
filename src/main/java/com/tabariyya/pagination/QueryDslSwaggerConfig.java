@@ -7,30 +7,34 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.MethodParameter;
 import org.springframework.web.method.HandlerMethod;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Configuration
 public class QueryDslSwaggerConfig {
 
     @Bean
-    public OperationCustomizer hideQueryDslContextHolderByType() {
+    public OperationCustomizer hideResolvedQueryParameters() {
         return (Operation operation, HandlerMethod handlerMethod) -> {
-            Class<?>[] parameterTypes = handlerMethod.getMethod().getParameterTypes();
             List<Parameter> swaggerParams = operation.getParameters();
-
-            if (swaggerParams != null) {
-                IntStream.range(0, parameterTypes.length)
-                        .filter(i -> QuerySpec.class.isAssignableFrom(parameterTypes[i]))
-                        .forEach(index -> {
-                            if (index < swaggerParams.size()) {
-                                swaggerParams.remove(index);
-                            }
-                        });
+            if (swaggerParams == null) {
+                return operation;
             }
+
+            Set<String> resolvedNames = Arrays.stream(handlerMethod.getMethodParameters())
+                    .filter(p -> QuerySpec.class.isAssignableFrom(p.getParameterType())
+                            || AggregationRequest.class.isAssignableFrom(p.getParameterType()))
+                    .map(MethodParameter::getParameterName)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            swaggerParams.removeIf(parameter -> resolvedNames.contains(parameter.getName()));
 
             return operation;
         };
@@ -91,6 +95,19 @@ public class QueryDslSwaggerConfig {
                 return operation;
             }
 
+            boolean hasQuerySpecParam = Arrays.stream(handlerMethod.getMethodParameters())
+                    .anyMatch(p -> QuerySpec.class.isAssignableFrom(p.getParameterType()));
+
+            if (!hasQuerySpecParam) {
+                operation.addParametersItem(new Parameter()
+                        .name("filters")
+                        .description("JSON-encoded filter criteria applied before aggregating; only fields the "
+                                + "endpoint allows may be used")
+                        .in("query")
+                        .required(false)
+                        .schema(new Schema<String>().type("string")));
+            }
+
             operation.addParametersItem(new Parameter()
                     .name("aggregations")
                     .description("JSON-encoded aggregates over the whole filtered set, keyed by the alias to report each "
@@ -110,26 +127,6 @@ public class QueryDslSwaggerConfig {
                     .in("query")
                     .required(false)
                     .schema(new Schema<String>().type("string")));
-
-            return operation;
-        };
-    }
-
-    @Bean
-    public OperationCustomizer hideAggregationRequestByType() {
-        return (Operation operation, HandlerMethod handlerMethod) -> {
-            Class<?>[] parameterTypes = handlerMethod.getMethod().getParameterTypes();
-            List<Parameter> swaggerParams = operation.getParameters();
-
-            if (swaggerParams != null) {
-                IntStream.range(0, parameterTypes.length)
-                        .filter(i -> AggregationRequest.class.isAssignableFrom(parameterTypes[i]))
-                        .forEach(index -> {
-                            if (index < swaggerParams.size()) {
-                                swaggerParams.remove(index);
-                            }
-                        });
-            }
 
             return operation;
         };

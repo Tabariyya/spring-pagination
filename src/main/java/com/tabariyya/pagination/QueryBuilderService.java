@@ -129,6 +129,89 @@ public class QueryBuilderService {
         }
     }
 
+    public void validateAggregationsAgainstFields(String[] allowedFields, String aggregationQuery) {
+        if (aggregationQuery == null || aggregationQuery.isEmpty()) {
+            return;
+        }
+        try {
+            JsonNode root = decodeAndDeserialize(aggregationQuery);
+            if (!root.isObject()) {
+                return;
+            }
+            Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
+            root.fields().forEachRemaining(entry -> {
+                String fieldName = aggregatedFieldName(entry.getValue());
+                if (fieldName != null) {
+                    checkAllowedField(allowed, fieldName, "aggregate");
+                }
+            });
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    public void validateGroupByAgainstFields(String[] allowedFields, String groupByQuery) {
+        if (groupByQuery == null || groupByQuery.isEmpty()) {
+            return;
+        }
+        try {
+            Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
+            for (String fieldName : groupByFieldNames(groupByQuery)) {
+                checkAllowedField(allowed, fieldName, "group by");
+            }
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (InvalidAggregationException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    public void validateFiltersAgainstFields(String[] allowedFields, String filterQuery) {
+        if (filterQuery == null || filterQuery.isEmpty()) {
+            return;
+        }
+        try {
+            Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
+            collectFilterFields(decodeAndDeserialize(filterQuery)).forEach(f -> checkAllowedField(allowed, f, "filter by"));
+        } catch (UnknownResponseFieldException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    private List<String> collectFilterFields(JsonNode node) {
+        List<String> names = new ArrayList<>();
+        if (!node.isObject()) {
+            return names;
+        }
+        node.fields().forEachRemaining(entry -> {
+            if (entry.getKey().startsWith("$")) {
+                JsonNode value = entry.getValue();
+                if (value.isArray()) {
+                    value.forEach(item -> names.addAll(collectFilterFields(item)));
+                } else {
+                    names.addAll(collectFilterFields(value));
+                }
+            } else {
+                names.add(entry.getKey());
+            }
+        });
+        return names;
+    }
+
+    private void checkAllowedField(Set<String> allowed, String fieldName, String action) {
+        if (!allowed.contains(fieldName)) {
+            throw new UnknownResponseFieldException("Cannot " + action + " '" + fieldName
+                    + "' on this endpoint; fields you can " + action + " are "
+                    + (allowed.isEmpty() ? "none" : String.join(", ", allowed)));
+        }
+    }
+
     private String aggregatedFieldName(JsonNode accumulator) {
         if (!accumulator.isObject() || accumulator.size() != 1) {
             return null;

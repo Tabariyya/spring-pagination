@@ -37,6 +37,9 @@ public class QuerySpec<TEntity> {
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
+        if (predicate != null) {
+            query.where(predicate);
+        }
         query.orderBy(orderSpecifiers).limit(limit);
 
         if (cursorRequest) {

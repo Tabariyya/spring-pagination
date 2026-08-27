@@ -1,5 +1,6 @@
 package com.tabariyya.pagination;
 
+import com.querydsl.core.types.Predicate;
 import com.querydsl.jpa.impl.JPAQuery;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
@@ -14,6 +15,7 @@ import java.util.Map;
 public class AggregationRequest<TEntity> {
 
     private AggregationQuery aggregationQuery = AggregationQuery.of(AggregationSpec.EMPTY);
+    private Predicate filter;
     private Map<String, Object> values;
     private List<Group> groups;
 
@@ -30,20 +32,32 @@ public class AggregationRequest<TEntity> {
             return;
         }
         if (aggregationQuery.isGrouped()) {
-            groups = aggregationQuery.fetchGroups(query);
+            fetchGroups(query);
         } else {
-            values = aggregationQuery.fetch(query);
+            fetch(query);
         }
     }
 
     public Map<String, Object> fetch(JPAQuery<TEntity> query) {
-        values = aggregationQuery.fetch(query);
+        values = aggregationQuery.fetch(filtered(query));
         return values;
     }
 
     public List<Group> fetchGroups(JPAQuery<TEntity> query) {
-        groups = aggregationQuery.fetchGroups(query);
+        groups = aggregationQuery.fetchGroups(filtered(query));
         return groups;
+    }
+
+    private JPAQuery<TEntity> filtered(JPAQuery<TEntity> query) {
+        return filter == null ? query : query.clone().where(filter);
+    }
+
+    public Predicate getFilter() {
+        return filter;
+    }
+
+    public void setFilter(Predicate filter) {
+        this.filter = filter;
     }
 
     public Map<String, Object> getValues() {

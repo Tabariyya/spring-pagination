@@ -10,8 +10,11 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class AggregationRequestResolver implements HandlerMethodArgumentResolver {
@@ -46,11 +49,13 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         String aggregations = request.getParameter("aggregations");
         String groupBy = request.getParameter("groupBy");
+        String filters = request.getParameter("filters");
 
         boolean hasAggregations = aggregations != null && !aggregations.isEmpty();
         boolean hasGroupBy = groupBy != null && !groupBy.isEmpty();
+        boolean hasFilters = filters != null && !filters.isEmpty();
 
-        if (!hasAggregations && !hasGroupBy) {
+        if (!hasAggregations && !hasGroupBy && !hasFilters) {
             request.setAttribute(AggregationRequest.class.getName(), aggregationRequest);
             return aggregationRequest;
         }
@@ -62,9 +67,21 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
                             + "result set and are computed on the first request only");
         }
 
-        Class<?> projection = resolveProjectionType(parameter, entity);
-        queryBuilderService.validateAggregationsAgainstResponse(projection, aggregations);
-        queryBuilderService.validateGroupByAgainstResponse(projection, groupBy);
+        AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
+        if (aggregateOver != null) {
+            queryBuilderService.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
+            queryBuilderService.validateGroupByAgainstFields(aggregateOver.groupBy(), groupBy);
+            if (hasFilters) {
+                queryBuilderService.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
+            }
+        } else {
+            Class<?> projection = resolveProjectionType(parameter, entity);
+            queryBuilderService.validateAggregationsAgainstResponse(projection, aggregations);
+            queryBuilderService.validateGroupByAgainstResponse(projection, groupBy);
+            if (hasFilters) {
+                queryBuilderService.validateFieldsAgainstResponse(projection, filters, null);
+            }
+        }
 
         AggregationSpec aggregationSpec = hasAggregations
                 ? queryBuilderService.buildAggregations(entity, aggregations)
@@ -74,22 +91,27 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
                 : GroupBySpec.EMPTY;
 
         aggregationRequest.setAggregationQuery(AggregationQuery.of(aggregationSpec, groupBySpec));
+        aggregationRequest.setFilter(hasFilters ? queryBuilderService.buildFilter(entity, filters) : null);
         request.setAttribute(AggregationRequest.class.getName(), aggregationRequest);
 
         return aggregationRequest;
     }
 
-    private Class<?> resolveProjectionType(MethodParameter parameter, Class<?> entity) {
-        AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
-        if (aggregateOver != null) {
-            return aggregateOver.value();
+    private String[] filterFields(AggregateOver aggregateOver) {
+        if (aggregateOver.filter().length > 0) {
+            return aggregateOver.filter();
         }
+        Set<String> merged = new LinkedHashSet<>(Arrays.asList(aggregateOver.groupBy()));
+        merged.addAll(Arrays.asList(aggregateOver.aggregate()));
+        return merged.toArray(new String[0]);
+    }
 
+    private Class<?> resolveProjectionType(MethodParameter parameter, Class<?> entity) {
         Class<?> responseType = resolveResponseElementType(parameter);
         if (responseType == null || responseType == Group.class || Map.class.isAssignableFrom(responseType)) {
             throw new InvalidAggregationException("Cannot tell which fields of " + entity.getSimpleName()
                     + " may be aggregated on this endpoint; annotate the AggregationRequest parameter with"
-                    + " @AggregateOver(YourResponseDto.class)");
+                    + " @AggregateOver(groupBy = {...}, aggregate = {...})");
         }
         return responseType;
     }

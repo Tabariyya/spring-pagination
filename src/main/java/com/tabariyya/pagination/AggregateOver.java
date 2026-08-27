@@ -8,5 +8,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.PARAMETER)
 public @interface AggregateOver {
-    Class<?> value();
+
+    String[] groupBy() default {};
+
+    String[] aggregate() default {};
+
+    String[] filter() default {};
 }
