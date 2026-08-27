@@ -3,9 +3,9 @@ package com.tabariyya.pagination;
 import com.querydsl.core.types.EntityPath;
 import com.querydsl.core.types.dsl.PathBuilder;
 
-public final class EntityPaths {
+public final class PathBuilders {
 
-    private EntityPaths() {
+    private PathBuilders() {
     }
 
     public static PathBuilder<?> of(Class<?> entity) {

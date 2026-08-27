@@ -3,7 +3,7 @@ package com.tabariyya.aggregation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.querydsl.core.types.dsl.PathBuilder;
-import com.tabariyya.pagination.EntityPaths;
+import com.tabariyya.pagination.PathBuilders;
 import com.tabariyya.pagination.FieldUtils;
 import com.tabariyya.pagination.GenericQueryDslException;
 import com.tabariyya.pagination.UnknownResponseFieldException;
@@ -299,7 +299,7 @@ public class AggregationQueryBuilder {
     }
 
     private PathBuilder<?> pathBuilderOf(Class<?> entity) {
-        return EntityPaths.of(entity);
+        return PathBuilders.of(entity);
     }
 
     private void checkResponseField(Class<?> responseType, String fieldName) {

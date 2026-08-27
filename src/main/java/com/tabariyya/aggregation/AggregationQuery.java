@@ -1,6 +1,6 @@
 package com.tabariyya.aggregation;
 
-import com.tabariyya.pagination.EntityPaths;
+import com.tabariyya.pagination.PathBuilders;
 import com.tabariyya.pagination.GenericQueryDslException;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
@@ -130,7 +130,7 @@ public final class AggregationQuery {
 
         private Builder(Class<?> entity) {
             this.entity = entity;
-            this.pathBuilder = EntityPaths.of(entity);
+            this.pathBuilder = PathBuilders.of(entity);
         }
 
         public Builder sum(String alias, String field) {

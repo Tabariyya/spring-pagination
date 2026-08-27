@@ -133,7 +133,7 @@ public class QueryBuilderService {
      */
     public Predicate buildKeysetPredicate(Class<?> entity, String orderingQuery, Map<String, Object> lastValues) {
         try {
-            PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+            PathBuilder<?> pathBuilder = PathBuilders.of(entity);
             JsonNode root = decodeAndDeserialize(orderingQuery);
 
             List<String> fieldNames = new ArrayList<>();
@@ -189,7 +189,7 @@ public class QueryBuilderService {
 
 
     private OrderSpecifier<?>[] orderSpecifierBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         JsonNode root = decodeAndDeserialize(query);
 
         if (!root.isObject()) {
@@ -236,7 +236,7 @@ public class QueryBuilderService {
      * @throws ClassCastException       if the operator is not compatible with either the field type or the value type
      */
     private Predicate predicateBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         JsonNode root = decodeAndDeserialize(query);
         return processNode(root, pathBuilder, entity);
     }
@@ -415,12 +415,6 @@ public class QueryBuilderService {
         Pattern datePattern = Pattern.compile("new\\s+Date\\(\"([^\"]+)\"\\)");
         Matcher matcher = datePattern.matcher(text);
         return matcher.find() ? matcher.group(1) : text;
-    }
-
-
-
-    private PathBuilder<?> pathBuilderOf(Class<?> entity) {
-        return EntityPaths.of(entity);
     }
 
     private JsonNode decodeAndDeserialize(String query) throws Exception {
