@@ -1,4 +1,4 @@
-package com.tabariyya.pagination;
+package com.tabariyya.aggregation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

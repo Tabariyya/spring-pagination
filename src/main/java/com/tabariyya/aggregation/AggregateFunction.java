@@ -1,4 +1,4 @@
-package com.tabariyya.pagination;
+package com.tabariyya.aggregation;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

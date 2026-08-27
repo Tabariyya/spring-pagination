@@ -10,17 +10,13 @@ import java.util.List;
 public class QuerySpecResolverConfig implements WebMvcConfigurer {
 
     private final QuerySpecResolver querySpecResolver;
-    private final AggregationRequestResolver aggregationRequestResolver;
 
-    public QuerySpecResolverConfig(QuerySpecResolver querySpecResolver,
-                                   AggregationRequestResolver aggregationRequestResolver) {
+    public QuerySpecResolverConfig(QuerySpecResolver querySpecResolver) {
         this.querySpecResolver = querySpecResolver;
-        this.aggregationRequestResolver = aggregationRequestResolver;
     }
 
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(querySpecResolver);
-        resolvers.add(aggregationRequestResolver);
     }
 }

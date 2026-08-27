@@ -1,5 +1,7 @@
-package com.tabariyya.pagination;
+package com.tabariyya.aggregation;
 
+import com.tabariyya.pagination.CursorParameterConflictException;
+import com.tabariyya.pagination.QueryBuilderService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
@@ -20,11 +22,14 @@ import java.util.Set;
 public class AggregationRequestResolver implements HandlerMethodArgumentResolver {
 
     private final QueryBuilderService queryBuilderService;
+    private final AggregationQueryBuilder aggregationQueryBuilder;
     private final AggregationRequest<?> aggregationRequest;
 
     public AggregationRequestResolver(QueryBuilderService queryBuilderService,
+                                      AggregationQueryBuilder aggregationQueryBuilder,
                                       AggregationRequest<?> aggregationRequest) {
         this.queryBuilderService = queryBuilderService;
+        this.aggregationQueryBuilder = aggregationQueryBuilder;
         this.aggregationRequest = aggregationRequest;
     }
 
@@ -68,25 +73,25 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
         if (aggregateOver != null) {
-            queryBuilderService.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
-            queryBuilderService.validateGroupByAgainstFields(aggregateOver.groupBy(), groupBy);
+            aggregationQueryBuilder.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
+            aggregationQueryBuilder.validateGroupByAgainstFields(aggregateOver.groupBy(), groupBy);
             if (hasFilters) {
-                queryBuilderService.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
+                aggregationQueryBuilder.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
             }
         } else {
             Class<?> projection = resolveProjectionType(parameter, entity);
-            queryBuilderService.validateAggregationsAgainstResponse(projection, aggregations);
-            queryBuilderService.validateGroupByAgainstResponse(projection, groupBy);
+            aggregationQueryBuilder.validateAggregationsAgainstResponse(projection, aggregations);
+            aggregationQueryBuilder.validateGroupByAgainstResponse(projection, groupBy);
             if (hasFilters) {
                 queryBuilderService.validateFieldsAgainstResponse(projection, filters, null);
             }
         }
 
         AggregationSpec aggregationSpec = hasAggregations
-                ? queryBuilderService.buildAggregations(entity, aggregations)
+                ? aggregationQueryBuilder.buildAggregations(entity, aggregations)
                 : AggregationSpec.EMPTY;
         GroupBySpec groupBySpec = hasGroupBy
-                ? queryBuilderService.buildGroupBy(entity, groupBy)
+                ? aggregationQueryBuilder.buildGroupBy(entity, groupBy)
                 : GroupBySpec.EMPTY;
 
         aggregationRequest.setAggregationQuery(AggregationQuery.of(aggregationSpec, groupBySpec));

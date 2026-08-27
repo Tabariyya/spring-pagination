@@ -1,4 +1,4 @@
-package com.tabariyya.pagination;
+package com.tabariyya.aggregation;
 
 import com.querydsl.core.types.Predicate;
 import com.querydsl.jpa.impl.JPAQuery;
