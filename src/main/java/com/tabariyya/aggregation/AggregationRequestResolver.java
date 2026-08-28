@@ -54,13 +54,11 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         String aggregations = request.getParameter("aggregations");
         String filters = request.getParameter("filters");
-        String groupBy = aggregations;
 
         boolean hasAggregations = aggregations != null && !aggregations.isEmpty();
-        boolean hasGroupBy = hasAggregations;
         boolean hasFilters = filters != null && !filters.isEmpty();
 
-        if (!hasAggregations && !hasGroupBy && !hasFilters) {
+        if (!hasAggregations && !hasFilters) {
             return aggregationRequest;
         }
 
@@ -74,14 +72,14 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
         if (aggregateOver != null) {
             aggregationQueryBuilder.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
-            aggregationQueryBuilder.validateGroupByAgainstFields(aggregateOver.groupBy(), groupBy);
+            aggregationQueryBuilder.validateGroupByAgainstFields(aggregateOver.groupBy(), aggregations);
             if (hasFilters) {
                 aggregationQueryBuilder.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
             }
         } else {
             Class<?> projection = resolveProjectionType(parameter, entity);
             aggregationQueryBuilder.validateAggregationsAgainstResponse(projection, aggregations);
-            aggregationQueryBuilder.validateGroupByAgainstResponse(projection, groupBy);
+            aggregationQueryBuilder.validateGroupByAgainstResponse(projection, aggregations);
             if (hasFilters) {
                 queryBuilderService.validateFieldsAgainstResponse(projection, filters, null);
             }
@@ -90,8 +88,8 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         AggregationSpec aggregationSpec = hasAggregations
                 ? aggregationQueryBuilder.buildAggregations(entity, aggregations)
                 : AggregationSpec.EMPTY;
-        GroupBySpec groupBySpec = hasGroupBy
-                ? aggregationQueryBuilder.buildGroupBy(entity, groupBy)
+        GroupBySpec groupBySpec = hasAggregations
+                ? aggregationQueryBuilder.buildGroupBy(entity, aggregations)
                 : GroupBySpec.EMPTY;
 
         aggregationRequest.setAggregationQuery(AggregationQuery.of(aggregationSpec, groupBySpec));

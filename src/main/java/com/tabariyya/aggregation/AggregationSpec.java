@@ -14,7 +14,7 @@ public final class AggregationSpec {
     private final List<Aggregation<?>> aggregations;
 
     public AggregationSpec(List<Aggregation<?>> aggregations) {
-        this.aggregations = Collections.unmodifiableList(new ArrayList<>(aggregations));
+        this.aggregations = List.copyOf(aggregations);
     }
 
     public boolean isEmpty() {

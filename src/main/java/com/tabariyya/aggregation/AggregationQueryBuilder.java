@@ -271,6 +271,6 @@ public class AggregationQueryBuilder {
     }
 
     private JsonNode decodeAndDeserialize(String query) throws Exception {
-        return objectMapper.readTree(URLDecoder.decode(query, StandardCharsets.UTF_8.name()));
+        return objectMapper.readTree(URLDecoder.decode(query, StandardCharsets.UTF_8));
     }
 }

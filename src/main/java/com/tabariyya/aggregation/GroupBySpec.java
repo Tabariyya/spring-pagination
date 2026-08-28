@@ -16,15 +16,11 @@ public final class GroupBySpec {
     private final List<GroupKey<?>> keys;
 
     public GroupBySpec(List<GroupKey<?>> keys) {
-        this.keys = Collections.unmodifiableList(new ArrayList<>(keys));
+        this.keys = List.copyOf(keys);
     }
 
     public boolean isEmpty() {
         return keys.isEmpty();
-    }
-
-    public List<GroupKey<?>> keys() {
-        return keys;
     }
 
     public Expression<?>[] expressions() {
