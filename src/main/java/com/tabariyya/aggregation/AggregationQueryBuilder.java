@@ -75,6 +75,9 @@ public class AggregationQueryBuilder {
                 return;
             }
             root.fields().forEachRemaining(entry -> {
+                if (GROUP_KEY.equals(entry.getKey())) {
+                    return;
+                }
                 String fieldName = aggregatedFieldName(entry.getValue());
                 if (fieldName != null) {
                     check.accept(fieldName);
@@ -142,11 +145,7 @@ public class AggregationQueryBuilder {
         }
     }
 
-    private String aggregatedFieldName(JsonNode accumulator) {
-        if (!accumulator.isObject() || accumulator.size() != 1) {
-            return null;
-        }
-        JsonNode operand = accumulator.fields().next().getValue();
+    private String aggregatedFieldName(JsonNode operand) {
         return operand.isTextual() ? stripFieldPrefix(operand.asText()) : null;
     }
 
@@ -230,49 +229,37 @@ public class AggregationQueryBuilder {
         return fieldNames;
     }
 
-    private Aggregation<?> buildAggregation(String alias, JsonNode accumulator,
+    private Aggregation<?> buildAggregation(String operator, JsonNode operand,
                                             PathBuilder<?> pathBuilder, Class<?> entityClass) throws NoSuchFieldException {
-        if (alias.isEmpty() || alias.startsWith("$")) {
-            throw new InvalidAggregationException("Invalid aggregation alias '" + alias
-                    + "': aliases are the names the results are reported under and must not start with '$'");
-        }
-        if (!accumulator.isObject() || accumulator.size() != 1) {
-            throw new InvalidAggregationException("Aggregation '" + alias
-                    + "' must be an object holding exactly one accumulator, for example {\"$sum\": \"$score\"}");
-        }
-
-        Map.Entry<String, JsonNode> entry = accumulator.fields().next();
-        AggregateFunction function = AggregateFunction.of(entry.getKey());
-        JsonNode operand = entry.getValue();
+        AggregateFunction function = AggregateFunction.of(operator);
 
         if (function == AggregateFunction.COUNT) {
             if (!operand.isNull() && !(operand.isObject() && operand.isEmpty())) {
-                throw new InvalidAggregationException("Aggregation '" + alias
-                        + "': $count counts rows and takes no field; write {\"$count\": {}},"
-                        + " or $countDistinct to count the distinct values of a field");
+                throw new InvalidAggregationException("$count counts rows and takes no field;"
+                        + " write {\"$count\": {}}, or $countDistinct to count the distinct values of a field");
             }
-            return AggregateExpressions.count(alias);
+            return AggregateExpressions.count();
         }
         if (function == AggregateFunction.SUM && operand.isNumber()) {
             if (!operand.isIntegralNumber() || operand.asInt() != 1) {
-                throw new InvalidAggregationException("Aggregation '" + alias
-                        + "': {\"$sum\": 1} is the only literal sum supported; sum a field with {\"$sum\": \"$field\"}");
+                throw new InvalidAggregationException("{\"$sum\": 1} is the only literal sum supported;"
+                        + " sum a field with {\"$sum\": \"$field\"}");
             }
-            return AggregateExpressions.count(alias);
+            return AggregateExpressions.count();
         }
 
-        String fieldName = fieldReference(alias, function, operand);
-        return AggregateExpressions.build(entityClass, pathBuilder, function, alias, fieldName);
+        String fieldName = fieldReference(function, operand);
+        return AggregateExpressions.build(entityClass, pathBuilder, function, fieldName);
     }
 
-    private static String fieldReference(String alias, AggregateFunction function, JsonNode operand) {
+    private static String fieldReference(AggregateFunction function, JsonNode operand) {
         if (!operand.isTextual()) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+            throw new InvalidAggregationException(function.operator()
                     + " needs a field reference such as \"$fieldName\"");
         }
         String fieldName = stripFieldPrefix(operand.asText());
         if (fieldName.isEmpty()) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+            throw new InvalidAggregationException(function.operator()
                     + " needs a non-empty field reference");
         }
         return fieldName;

@@ -66,8 +66,8 @@ public class AggregationSwaggerConfig {
             operation.addParametersItem(new Parameter()
                     .name("aggregations")
                     .description("JSON-encoded aggregation, in MongoDB $group form: \"$groupBy\" names the field or "
-                            + "fields to group by and every other key is an alias for an accumulator, e.g. "
-                            + "{\"$groupBy\":\"$score\",\"average\":{\"$avg\":\"$score\"},\"rows\":{\"$count\":{}}}. "
+                            + "fields to group by and every other key is an accumulator, e.g. "
+                            + "{\"$groupBy\":\"$score\",\"$avg\":\"$score\",\"$count\":{}}. "
                             + "\"$groupBy\" accepts a field, a comma-separated list, or an array. Supports $sum, $avg, "
                             + "$min, $max, $count and $countDistinct, and only fields the endpoint permits")
                     .in("query")

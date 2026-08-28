@@ -31,24 +31,24 @@ final class AggregateExpressions {
     }
 
     static Aggregation<?> build(Class<?> entity, PathBuilder<?> pathBuilder,
-                                AggregateFunction function, String alias, String fieldName) throws NoSuchFieldException {
+                                AggregateFunction function, String fieldName) throws NoSuchFieldException {
         if (function == AggregateFunction.COUNT) {
-            return count(alias);
+            return count();
         }
 
         Class<?> fieldType = fieldType(entity, fieldName);
         switch (function) {
             case SUM:
-                return sum(alias, fieldName, pathBuilder, requireNumeric(alias, function, fieldName, fieldType));
+                return sum(fieldName, pathBuilder, requireNumeric(function, fieldName, fieldType));
             case AVG:
-                return numberAggregation(alias, fieldName, function, Ops.AggOps.AVG_AGG, Double.class,
-                        numberPath(pathBuilder, fieldName, requireNumeric(alias, function, fieldName, fieldType)));
+                return numberAggregation(fieldName, function, Ops.AggOps.AVG_AGG, Double.class,
+                        numberPath(pathBuilder, fieldName, requireNumeric(function, fieldName, fieldType)));
             case MIN:
             case MAX:
-                return extremum(alias, fieldName, function,
-                        requireComparable(alias, function, fieldName, fieldType), pathBuilder);
+                return extremum(fieldName, function,
+                        requireComparable(function, fieldName, fieldType), pathBuilder);
             case COUNT_DISTINCT:
-                return countDistinct(alias, fieldName, pathBuilder);
+                return countDistinct(fieldName, pathBuilder);
             default:
                 throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
         }
@@ -63,17 +63,17 @@ final class AggregateExpressions {
         return box(field.getType());
     }
 
-    static Class<?> requireNumeric(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+    static Class<?> requireNumeric(AggregateFunction function, String fieldName, Class<?> fieldType) {
         if (!Number.class.isAssignableFrom(fieldType) || !Comparable.class.isAssignableFrom(fieldType)) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+            throw new InvalidAggregationException(function.operator()
                     + " needs a numeric field, but '" + fieldName + "' is " + fieldType.getSimpleName());
         }
         return fieldType;
     }
 
-    static Class<?> requireComparable(String alias, AggregateFunction function, String fieldName, Class<?> fieldType) {
+    static Class<?> requireComparable(AggregateFunction function, String fieldName, Class<?> fieldType) {
         if (!Comparable.class.isAssignableFrom(fieldType)) {
-            throw new InvalidAggregationException("Aggregation '" + alias + "': " + function.operator()
+            throw new InvalidAggregationException(function.operator()
                     + " needs a comparable field, but '" + fieldName + "' is " + fieldType.getSimpleName());
         }
         return fieldType;
@@ -87,45 +87,45 @@ final class AggregateExpressions {
         return new GroupKey<>(fieldName, fieldType, pathBuilder.getSimple(fieldName, fieldType));
     }
 
-    static Aggregation<Long> count(String alias) {
-        return new Aggregation<>(alias, null, AggregateFunction.COUNT, Long.class,
+    static Aggregation<Long> count() {
+        return new Aggregation<>(null, AggregateFunction.COUNT, Long.class,
                 Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_ALL_AGG));
     }
 
-    private static Aggregation<Long> countDistinct(String alias, String field, PathBuilder<?> pathBuilder) {
-        return new Aggregation<>(alias, field, AggregateFunction.COUNT_DISTINCT, Long.class,
+    private static Aggregation<Long> countDistinct(String field, PathBuilder<?> pathBuilder) {
+        return new Aggregation<>(field, AggregateFunction.COUNT_DISTINCT, Long.class,
                 Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_DISTINCT_AGG, pathBuilder.get(field)));
     }
 
     private static Aggregation<?> sum(
-            String alias, String field, PathBuilder<?> pathBuilder, Class<?> boxedFieldType) {
+            String field, PathBuilder<?> pathBuilder, Class<?> boxedFieldType) {
         NumberPath<?> path = numberPath(pathBuilder, field, boxedFieldType);
         if (boxedFieldType == BigDecimal.class) {
-            return numberAggregation(alias, field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, BigDecimal.class, path);
+            return numberAggregation(field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, BigDecimal.class, path);
         }
         if (boxedFieldType == BigInteger.class) {
-            return numberAggregation(alias, field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, BigInteger.class, path);
+            return numberAggregation(field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, BigInteger.class, path);
         }
         if (boxedFieldType == Double.class || boxedFieldType == Float.class) {
-            return numberAggregation(alias, field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, Double.class, path);
+            return numberAggregation(field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, Double.class, path);
         }
-        return numberAggregation(alias, field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, Long.class, path);
+        return numberAggregation(field, AggregateFunction.SUM, Ops.AggOps.SUM_AGG, Long.class, path);
     }
 
     private static <R extends Number & Comparable<R>> Aggregation<R> numberAggregation(
-            String alias, String field, AggregateFunction function, Operator operator,
+            String field, AggregateFunction function, Operator operator,
             Class<R> resultType, Expression<?> operand) {
-        return new Aggregation<>(alias, field, function, resultType,
+        return new Aggregation<>(field, function, resultType,
                 Expressions.numberOperation(resultType, operator, operand));
     }
 
     @SuppressWarnings("unchecked")
     private static <C extends Comparable<C>> Aggregation<C> extremum(
-            String alias, String field, AggregateFunction function,
+            String field, AggregateFunction function,
             Class<?> boxedFieldType, PathBuilder<?> pathBuilder) {
         Class<C> resultType = (Class<C>) boxedFieldType;
         Operator operator = function == AggregateFunction.MIN ? Ops.AggOps.MIN_AGG : Ops.AggOps.MAX_AGG;
-        return new Aggregation<>(alias, field, function, resultType, Expressions.comparableOperation(
+        return new Aggregation<>(field, function, resultType, Expressions.comparableOperation(
                 resultType, operator, comparablePath(pathBuilder, field, boxedFieldType)));
     }
 
