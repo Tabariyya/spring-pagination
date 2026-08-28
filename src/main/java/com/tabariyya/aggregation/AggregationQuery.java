@@ -52,7 +52,8 @@ public final class AggregationQuery {
 
     public List<AggregationGroup> fetchGroups(JPAQuery<?> query) {
         if (!isGrouped()) {
-            throw new IllegalStateException("This aggregation has no group by; call fetch instead");
+            throw new InvalidAggregationException(
+                    "groupBy is required; name at least one field to group the aggregates by");
         }
 
         Expression<?>[] keyExpressions = groupBy.expressions();
