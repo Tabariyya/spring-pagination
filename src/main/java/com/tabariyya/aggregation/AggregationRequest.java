@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
-import java.util.Map;
 
 @Component
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -16,9 +15,6 @@ public class AggregationRequest<TEntity> {
 
     private AggregationQuery aggregationQuery = AggregationQuery.of(AggregationSpec.EMPTY, GroupBySpec.EMPTY);
     private Predicate filter;
-
-
-
 
     public List<AggregationGroup> fetchGroups(JPAQuery<TEntity> query) {
         return aggregationQuery.fetchGroups(filtered(query));
@@ -28,13 +24,11 @@ public class AggregationRequest<TEntity> {
         return filter == null ? query : query.clone().where(filter);
     }
 
-
     public void setAggregationQuery(AggregationQuery aggregationQuery) {
         this.aggregationQuery = aggregationQuery == null
                 ? AggregationQuery.of(AggregationSpec.EMPTY, GroupBySpec.EMPTY)
                 : aggregationQuery;
     }
-
 
     public void setFilter(Predicate filter) {
         this.filter = filter;

@@ -1,21 +1,14 @@
 package com.tabariyya.aggregation;
 
-import com.tabariyya.pagination.PathBuilders;
-import com.tabariyya.pagination.GenericQueryDslException;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.Ops;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
-import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public final class AggregationQuery {
 
@@ -31,12 +24,9 @@ public final class AggregationQuery {
         this.maxGroups = maxGroups;
     }
 
-
     public static AggregationQuery of(AggregationSpec aggregations, GroupBySpec groupBy) {
         return new AggregationQuery(aggregations, groupBy, DEFAULT_MAX_GROUPS);
     }
-
-
 
     public boolean isGrouped() {
         return !groupBy.isEmpty();
@@ -45,10 +35,6 @@ public final class AggregationQuery {
     public boolean isEmpty() {
         return aggregations.isEmpty() && groupBy.isEmpty();
     }
-
-
-
-
 
     public List<AggregationGroup> fetchGroups(JPAQuery<?> query) {
         if (!isGrouped()) {

@@ -13,6 +13,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.function.Consumer;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,45 +46,24 @@ public class AggregationQueryBuilder {
     }
 
     public void validateAggregationsAgainstResponse(Class<?> responseType, String aggregationQuery) {
-        if (aggregationQuery == null || aggregationQuery.isEmpty()) {
-            return;
-        }
-        try {
-            JsonNode root = decodeAndDeserialize(aggregationQuery);
-            if (!root.isObject()) {
-                return;
-            }
-            root.fields().forEachRemaining(entry -> {
-                String fieldName = aggregatedFieldName(entry.getValue());
-                if (fieldName != null) {
-                    checkResponseField(responseType, fieldName);
-                }
-            });
-        } catch (UnknownResponseFieldException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new GenericQueryDslException(e);
-        }
-    }
-
-    public void validateGroupByAgainstResponse(Class<?> responseType, String groupByQuery) {
-        if (groupByQuery == null || groupByQuery.isEmpty()) {
-            return;
-        }
-        try {
-            for (String fieldName : groupByFieldNames(groupByQuery)) {
-                checkResponseField(responseType, fieldName);
-            }
-        } catch (UnknownResponseFieldException e) {
-            throw e;
-        } catch (InvalidAggregationException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new GenericQueryDslException(e);
-        }
+        validateAggregations(aggregationQuery, fieldName -> checkResponseField(responseType, fieldName));
     }
 
     public void validateAggregationsAgainstFields(String[] allowedFields, String aggregationQuery) {
+        Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
+        validateAggregations(aggregationQuery, fieldName -> checkAllowedField(allowed, fieldName, "aggregate"));
+    }
+
+    public void validateGroupByAgainstResponse(Class<?> responseType, String groupByQuery) {
+        validateGroupBy(groupByQuery, fieldName -> checkResponseField(responseType, fieldName));
+    }
+
+    public void validateGroupByAgainstFields(String[] allowedFields, String groupByQuery) {
+        Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
+        validateGroupBy(groupByQuery, fieldName -> checkAllowedField(allowed, fieldName, "group by"));
+    }
+
+    private void validateAggregations(String aggregationQuery, Consumer<String> check) {
         if (aggregationQuery == null || aggregationQuery.isEmpty()) {
             return;
         }
@@ -92,11 +72,10 @@ public class AggregationQueryBuilder {
             if (!root.isObject()) {
                 return;
             }
-            Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
             root.fields().forEachRemaining(entry -> {
                 String fieldName = aggregatedFieldName(entry.getValue());
                 if (fieldName != null) {
-                    checkAllowedField(allowed, fieldName, "aggregate");
+                    check.accept(fieldName);
                 }
             });
         } catch (UnknownResponseFieldException e) {
@@ -106,18 +85,13 @@ public class AggregationQueryBuilder {
         }
     }
 
-    public void validateGroupByAgainstFields(String[] allowedFields, String groupByQuery) {
+    private void validateGroupBy(String groupByQuery, Consumer<String> check) {
         if (groupByQuery == null || groupByQuery.isEmpty()) {
             return;
         }
         try {
-            Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
-            for (String fieldName : groupByFieldNames(groupByQuery)) {
-                checkAllowedField(allowed, fieldName, "group by");
-            }
-        } catch (UnknownResponseFieldException e) {
-            throw e;
-        } catch (InvalidAggregationException e) {
+            groupByFieldNames(groupByQuery).forEach(check);
+        } catch (UnknownResponseFieldException | InvalidAggregationException e) {
             throw e;
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
@@ -175,7 +149,7 @@ public class AggregationQueryBuilder {
     }
 
     private AggregationSpec aggregationBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         JsonNode root = decodeAndDeserialize(query);
 
         if (!root.isObject()) {
@@ -193,7 +167,7 @@ public class AggregationQueryBuilder {
     }
 
     private GroupBySpec groupByBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         List<String> fieldNames = groupByFieldNames(query);
 
         if (fieldNames.isEmpty()) {
@@ -296,10 +270,6 @@ public class AggregationQueryBuilder {
 
     private static String stripFieldPrefix(String reference) {
         return reference.startsWith("$") ? reference.substring(1) : reference;
-    }
-
-    private PathBuilder<?> pathBuilderOf(Class<?> entity) {
-        return PathBuilders.of(entity);
     }
 
     private void checkResponseField(Class<?> responseType, String fieldName) {
