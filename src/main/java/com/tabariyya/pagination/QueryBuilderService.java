@@ -123,7 +123,7 @@ public class QueryBuilderService {
      */
     public Predicate buildKeysetPredicate(Class<?> entity, String orderingQuery, Map<String, Object> lastValues) {
         try {
-            PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+            PathBuilder<?> pathBuilder = PathBuilders.of(entity);
             JsonNode root = decodeAndDeserialize(orderingQuery);
 
             List<String> fieldNames = new ArrayList<>();
@@ -171,7 +171,7 @@ public class QueryBuilderService {
     }
 
     private OrderSpecifier<?>[] orderSpecifierBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         JsonNode root = decodeAndDeserialize(query);
 
         if (!root.isObject()) {
@@ -218,7 +218,7 @@ public class QueryBuilderService {
      * @throws ClassCastException       if the operator is not compatible with either the field type or the value type
      */
     private Predicate predicateBuilder(Class<?> entity, String query) throws Throwable {
-        PathBuilder<?> pathBuilder = pathBuilderOf(entity);
+        PathBuilder<?> pathBuilder = PathBuilders.of(entity);
         JsonNode root = decodeAndDeserialize(query);
         return processNode(root, pathBuilder, entity);
     }
@@ -397,23 +397,6 @@ public class QueryBuilderService {
         Pattern datePattern = Pattern.compile("new\\s+Date\\(\"([^\"]+)\"\\)");
         Matcher matcher = datePattern.matcher(text);
         return matcher.find() ? matcher.group(1) : text;
-    }
-
-    private Class<?> qClassOf(Class<?> entity) throws ClassNotFoundException {
-        String qClassName = entity.getPackage().getName() + ".Q" + entity.getSimpleName();
-        return Class.forName(qClassName);
-    }
-
-    private String instanceNameOf(Class<?> entity) {
-        String entityName = entity.getSimpleName();
-        return entityName.substring(0, 1).toLowerCase() + entityName.substring(1);
-    }
-
-    private PathBuilder<?> pathBuilderOf(Class<?> entity) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
-        String entityInstanceName = instanceNameOf(entity);
-        Class<?> qClass = qClassOf(entity);
-        EntityPath<?> entityPath = (EntityPath<?>) qClass.getField(entityInstanceName).get(null);
-        return new PathBuilder<>(entityPath.getType(), entityPath.getMetadata());
     }
 
     private JsonNode decodeAndDeserialize(String query) throws Exception {
