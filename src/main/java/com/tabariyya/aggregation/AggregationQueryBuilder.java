@@ -23,6 +23,8 @@ import java.util.Set;
 @Service
 public class AggregationQueryBuilder {
 
+    public static final String GROUP_KEY = "$groupBy";
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public AggregationSpec buildAggregations(Class<?> entity, String query) {
@@ -160,6 +162,9 @@ public class AggregationQueryBuilder {
         Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> entry = fields.next();
+            if (GROUP_KEY.equals(entry.getKey())) {
+                continue;
+            }
             aggregations.add(buildAggregation(entry.getKey(), entry.getValue(), pathBuilder, entity));
         }
 
@@ -171,14 +176,16 @@ public class AggregationQueryBuilder {
         List<String> fieldNames = groupByFieldNames(query);
 
         if (fieldNames.isEmpty()) {
-            throw new InvalidAggregationException("Group by must name at least one field");
+            throw new InvalidAggregationException(
+                    GROUP_KEY + " is required; name at least one field to group the aggregates by");
         }
 
         List<GroupKey<?>> keys = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (String fieldName : fieldNames) {
             if (!seen.add(fieldName)) {
-                throw new InvalidAggregationException("Group by names '" + fieldName + "' more than once");
+                throw new InvalidAggregationException(
+                        GROUP_KEY + " names '" + fieldName + "' more than once");
             }
             keys.add(AggregateExpressions.key(entity, pathBuilder, fieldName));
         }
@@ -187,34 +194,37 @@ public class AggregationQueryBuilder {
     }
 
     private List<String> groupByFieldNames(String query) throws Exception {
-        String decoded = URLDecoder.decode(query, StandardCharsets.UTF_8.name()).trim();
-        List<String> fieldNames = new ArrayList<>();
+        JsonNode root = decodeAndDeserialize(query);
+        if (!root.isObject()) {
+            throw new InvalidAggregationException("Aggregation specification must be a JSON object");
+        }
 
-        if (decoded.startsWith("[") || decoded.startsWith("\"")) {
-            JsonNode root = objectMapper.readTree(decoded);
-            if (root.isTextual()) {
-                fieldNames.add(stripFieldPrefix(root.asText().trim()));
-            } else if (root.isArray()) {
-                for (JsonNode element : root) {
-                    if (!element.isTextual()) {
-                        throw new InvalidAggregationException(
-                                "Group by array must hold field names as strings, for example [\"score\"]");
-                    }
-                    fieldNames.add(stripFieldPrefix(element.asText().trim()));
-                }
-            } else {
-                throw new InvalidAggregationException(
-                        "Group by must be a field name or an array of field names");
-            }
-        } else {
-            for (String part : decoded.split(",", -1)) {
+        JsonNode key = root.get(GROUP_KEY);
+        if (key == null || key.isNull()) {
+            return List.of();
+        }
+
+        List<String> fieldNames = new ArrayList<>();
+        if (key.isTextual()) {
+            for (String part : key.asText().split(",", -1)) {
                 fieldNames.add(stripFieldPrefix(part.trim()));
             }
+        } else if (key.isArray()) {
+            for (JsonNode element : key) {
+                if (!element.isTextual()) {
+                    throw new InvalidAggregationException(
+                            GROUP_KEY + " must hold field names as strings, for example [\"$score\"]");
+                }
+                fieldNames.add(stripFieldPrefix(element.asText().trim()));
+            }
+        } else {
+            throw new InvalidAggregationException(
+                    GROUP_KEY + " must be a field name or an array of field names");
         }
 
         for (String fieldName : fieldNames) {
             if (fieldName.isEmpty()) {
-                throw new InvalidAggregationException("Group by contains an empty field name");
+                throw new InvalidAggregationException(GROUP_KEY + " contains an empty field name");
             }
         }
         return fieldNames;

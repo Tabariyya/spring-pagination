@@ -65,19 +65,11 @@ public class AggregationSwaggerConfig {
 
             operation.addParametersItem(new Parameter()
                     .name("aggregations")
-                    .description("JSON-encoded aggregates over the whole filtered set, keyed by the alias to report each "
-                            + "under, e.g. {\"total\":{\"$sum\":\"$score\"},\"average\":{\"$avg\":\"$score\"},"
-                            + "\"rows\":{\"$count\":{}}}; supports $sum, $avg, $min, $max, $count and $countDistinct, "
-                            + "and only fields present in the response body are allowed")
-                    .in("query")
-                    .required(false)
-                    .schema(new Schema<String>().type("string")));
-
-            operation.addParametersItem(new Parameter()
-                    .name("groupBy")
-                    .description("Field name, comma-separated list, or JSON array of field names to group by, "
-                            + "e.g. score or [\"score\",\"activityId\"]; the aggregates are then computed per group and the "
-                            + "endpoint returns a list of {key, values} groups instead of a single object")
+                    .description("JSON-encoded aggregation, in MongoDB $group form: \"$groupBy\" names the field or "
+                            + "fields to group by and every other key is an alias for an accumulator, e.g. "
+                            + "{\"$groupBy\":\"$score\",\"average\":{\"$avg\":\"$score\"},\"rows\":{\"$count\":{}}}. "
+                            + "\"$groupBy\" accepts a field, a comma-separated list, or an array. Supports $sum, $avg, "
+                            + "$min, $max, $count and $countDistinct, and only fields the endpoint permits")
                     .in("query")
                     .required(false)
                     .schema(new Schema<String>().type("string")));

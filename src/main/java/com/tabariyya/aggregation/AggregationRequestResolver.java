@@ -53,11 +53,11 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         }
 
         String aggregations = request.getParameter("aggregations");
-        String groupBy = request.getParameter("groupBy");
         String filters = request.getParameter("filters");
+        String groupBy = aggregations;
 
         boolean hasAggregations = aggregations != null && !aggregations.isEmpty();
-        boolean hasGroupBy = groupBy != null && !groupBy.isEmpty();
+        boolean hasGroupBy = hasAggregations;
         boolean hasFilters = filters != null && !filters.isEmpty();
 
         if (!hasAggregations && !hasGroupBy && !hasFilters) {
@@ -67,7 +67,7 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         String cursor = request.getParameter("cursor");
         if (cursor != null && !cursor.isEmpty()) {
             throw new CursorParameterConflictException(
-                    "aggregations and groupBy are not allowed together with a cursor; they describe the whole "
+                    "aggregations are not allowed together with a cursor; they describe the whole "
                             + "result set and are computed on the first request only");
         }
 
