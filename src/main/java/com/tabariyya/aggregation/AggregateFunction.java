@@ -10,7 +10,6 @@ public enum AggregateFunction {
     AVG("$avg"),
     MIN("$min"),
     MAX("$max"),
-    COUNT("$count"),
     COUNT_DISTINCT("$countDistinct"),
     GROUPED_BY(null);
 

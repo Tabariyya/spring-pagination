@@ -233,19 +233,11 @@ public class AggregationQueryBuilder {
                                             PathBuilder<?> pathBuilder, Class<?> entityClass) throws NoSuchFieldException {
         AggregateFunction function = AggregateFunction.of(operator);
 
-        if (function == AggregateFunction.COUNT) {
-            if (!operand.isNull() && !(operand.isObject() && operand.isEmpty())) {
-                throw new InvalidAggregationException("$count counts rows and takes no field;"
-                        + " write {\"$count\": {}}, or $countDistinct to count the distinct values of a field");
-            }
-            return AggregateExpressions.count();
-        }
         if (function == AggregateFunction.SUM && operand.isNumber()) {
-            if (!operand.isIntegralNumber() || operand.asInt() != 1) {
-                throw new InvalidAggregationException("{\"$sum\": 1} is the only literal sum supported;"
-                        + " sum a field with {\"$sum\": \"$field\"}");
-            }
-            return AggregateExpressions.count();
+            throw new InvalidAggregationException("counting rows is not an accumulator;"
+                    + " every group already reports its row count as \"total\"."
+                    + " Sum a field with {\"$sum\": \"$field\"},"
+                    + " or use $countDistinct for the distinct values of a field");
         }
 
         String fieldName = fieldReference(function, operand);

@@ -32,10 +32,6 @@ final class AggregateExpressions {
 
     static Aggregation<?> build(Class<?> entity, PathBuilder<?> pathBuilder,
                                 AggregateFunction function, String fieldName) throws NoSuchFieldException {
-        if (function == AggregateFunction.COUNT) {
-            return count();
-        }
-
         Class<?> fieldType = fieldType(entity, fieldName);
         switch (function) {
             case SUM:
@@ -85,11 +81,6 @@ final class AggregateExpressions {
 
     static <T> GroupKey<T> groupKey(PathBuilder<?> pathBuilder, String fieldName, Class<T> fieldType) {
         return new GroupKey<>(fieldName, fieldType, pathBuilder.getSimple(fieldName, fieldType));
-    }
-
-    static Aggregation<Long> count() {
-        return new Aggregation<>(null, AggregateFunction.COUNT, Long.class,
-                Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_ALL_AGG));
     }
 
     private static Aggregation<Long> countDistinct(String field, PathBuilder<?> pathBuilder) {
