@@ -7,9 +7,7 @@ import com.querydsl.core.types.OrderSpecifier;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class GroupBySpec {
 
@@ -54,11 +52,4 @@ public final class GroupBySpec {
         return entries;
     }
 
-    public Map<String, Object> read(Tuple tuple) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        for (GroupKey<?> key : keys) {
-            values.put(key.field(), key.extract(tuple));
-        }
-        return Collections.unmodifiableMap(values);
-    }
 }

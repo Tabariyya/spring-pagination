@@ -37,9 +37,6 @@ public class AggregationRequest<TEntity> {
         return filter == null ? query : query.clone().where(filter);
     }
 
-    public AggregationQuery getAggregationQuery() {
-        return aggregationQuery;
-    }
 
     public void setAggregationQuery(AggregationQuery aggregationQuery) {
         this.aggregationQuery = aggregationQuery == null
@@ -47,9 +44,6 @@ public class AggregationRequest<TEntity> {
                 : aggregationQuery;
     }
 
-    public Predicate getFilter() {
-        return filter;
-    }
 
     public void setFilter(Predicate filter) {
         this.filter = filter;

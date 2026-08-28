@@ -23,9 +23,6 @@ public final class AggregationSpec {
         return aggregations.isEmpty();
     }
 
-    public List<Aggregation<?>> aggregations() {
-        return aggregations;
-    }
 
     public Expression<?>[] expressions() {
         Expression<?>[] expressions = new Expression<?>[aggregations.size()];
