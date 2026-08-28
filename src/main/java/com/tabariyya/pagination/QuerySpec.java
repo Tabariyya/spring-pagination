@@ -27,7 +27,6 @@ public class QuerySpec<TEntity> {
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
-    private boolean pageFetched;
 
     /**
      * Applies the ordering and limit to the given query, fetches the page and
@@ -37,12 +36,7 @@ public class QuerySpec<TEntity> {
      * cursor requests skip it.
      */
     @SuppressWarnings("unchecked")
-    public List<TEntity> fetchPage(JPAQuery<TEntity> baseQuery) {
-        pageFetched = true;
-        JPAQuery<TEntity> query = baseQuery.clone();
-        if (predicate != null) {
-            query.where(predicate);
-        }
+    public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
         query.orderBy(orderSpecifiers).limit(limit);
 
         if (cursorRequest) {
@@ -68,10 +62,6 @@ public class QuerySpec<TEntity> {
      * Total count of rows matching the filter, set by {@link #fetchPage} on the
      * first request; null on cursor requests.
      */
-    public boolean isPageFetched() {
-        return pageFetched;
-    }
-
     public Long getCount() {
         return count;
     }

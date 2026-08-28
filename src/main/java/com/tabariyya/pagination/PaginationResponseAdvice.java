@@ -39,7 +39,7 @@ public class PaginationResponseAdvice implements ResponseBodyAdvice<Object> {
         }
 
         Object attribute = requestAttributes.getAttribute(QuerySpec.class.getName(), RequestAttributes.SCOPE_REQUEST);
-        if (!(attribute instanceof QuerySpec<?> querySpec) || !querySpec.isPageFetched()) {
+        if (!(attribute instanceof QuerySpec<?> querySpec)) {
             return body;
         }
 
