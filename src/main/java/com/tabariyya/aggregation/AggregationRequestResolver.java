@@ -3,6 +3,7 @@ package com.tabariyya.aggregation;
 import com.tabariyya.pagination.CursorParameterConflictException;
 import com.tabariyya.pagination.QueryBuilderService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,7 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
     }
 
     @Override
-    public Object resolveArgument(MethodParameter parameter,
+    public Object resolveArgument(@NonNull MethodParameter parameter,
                                   ModelAndViewContainer mavContainer,
                                   NativeWebRequest webRequest,
                                   WebDataBinderFactory binderFactory) {

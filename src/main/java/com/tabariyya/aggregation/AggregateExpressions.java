@@ -33,21 +33,16 @@ final class AggregateExpressions {
     static Aggregation<?> build(Class<?> entity, PathBuilder<?> pathBuilder,
                                 AggregateFunction function, String fieldName) throws NoSuchFieldException {
         Class<?> fieldType = fieldType(entity, fieldName);
-        switch (function) {
-            case SUM:
-                return sum(fieldName, pathBuilder, requireNumeric(function, fieldName, fieldType));
-            case AVG:
-                return numberAggregation(fieldName, function, Ops.AggOps.AVG_AGG, Double.class,
-                        numberPath(pathBuilder, fieldName, requireNumeric(function, fieldName, fieldType)));
-            case MIN:
-            case MAX:
-                return extremum(fieldName, function,
-                        requireComparable(function, fieldName, fieldType), pathBuilder);
-            case COUNT_DISTINCT:
-                return countDistinct(fieldName, pathBuilder);
-            default:
-                throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
-        }
+        return switch (function) {
+            case SUM -> sum(fieldName, pathBuilder, requireNumeric(function, fieldName, fieldType));
+            case AVG -> numberAggregation(fieldName, function, Ops.AggOps.AVG_AGG, Double.class,
+                    numberPath(pathBuilder, fieldName, requireNumeric(function, fieldName, fieldType)));
+            case MIN, MAX -> extremum(fieldName, function,
+                    requireComparable(function, fieldName, fieldType), pathBuilder);
+            case COUNT_DISTINCT -> countDistinct(fieldName, pathBuilder);
+            default ->
+                    throw new InvalidAggregationException("Unsupported aggregate function '" + function.operator() + "'");
+        };
     }
 
     static GroupKey<?> key(Class<?> entity, PathBuilder<?> pathBuilder, String fieldName) throws NoSuchFieldException {
