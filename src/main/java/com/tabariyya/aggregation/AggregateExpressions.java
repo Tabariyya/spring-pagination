@@ -32,6 +32,17 @@ final class AggregateExpressions {
 
     static Aggregation<?> build(Class<?> entity, PathBuilder<?> pathBuilder,
                                 AggregateFunction function, String alias, String fieldName) throws NoSuchFieldException {
+        return withMeta(expression(entity, pathBuilder, function, alias, fieldName), function, fieldName);
+    }
+
+    private static <T> Aggregation<T> withMeta(Aggregation<T> aggregation, AggregateFunction function, String field) {
+        return new Aggregation<>(
+                aggregation.alias(), field, function, aggregation.resultType(), aggregation.expression());
+    }
+
+    private static Aggregation<?> expression(Class<?> entity, PathBuilder<?> pathBuilder,
+                                             AggregateFunction function, String alias, String fieldName)
+            throws NoSuchFieldException {
         if (function == AggregateFunction.COUNT) {
             return count(alias);
         }
@@ -89,12 +100,12 @@ final class AggregateExpressions {
     }
 
     static Aggregation<Long> count(String alias) {
-        return new Aggregation<>(alias, Long.class,
+        return new Aggregation<>(alias, null, AggregateFunction.COUNT, Long.class,
                 Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_ALL_AGG));
     }
 
     static Aggregation<Long> countDistinct(String alias, PathBuilder<?> pathBuilder, String fieldName) {
-        return new Aggregation<>(alias, Long.class, Expressions.numberOperation(
+        return new Aggregation<>(alias, null, AggregateFunction.COUNT, Long.class, Expressions.numberOperation(
                 Long.class, Ops.AggOps.COUNT_DISTINCT_AGG, pathBuilder.get(fieldName)));
     }
 
@@ -125,7 +136,8 @@ final class AggregateExpressions {
 
     private static <R extends Number & Comparable<R>> Aggregation<R> numberAggregation(
             String alias, Operator operator, Class<R> resultType, Expression<?> operand) {
-        return new Aggregation<>(alias, resultType, Expressions.numberOperation(resultType, operator, operand));
+        return new Aggregation<>(alias, null, AggregateFunction.SUM, resultType,
+                Expressions.numberOperation(resultType, operator, operand));
     }
 
     @SuppressWarnings("unchecked")
@@ -144,7 +156,7 @@ final class AggregateExpressions {
     private static <C extends Comparable<C>> Aggregation<C> comparableAggregation(
             String alias, Operator operator, Class<?> boxedFieldType, Expression<?> operand) {
         Class<C> resultType = (Class<C>) boxedFieldType;
-        return new Aggregation<>(alias, resultType,
+        return new Aggregation<>(alias, null, AggregateFunction.MIN, resultType,
                 Expressions.comparableOperation(resultType, operator, operand));
     }
 }

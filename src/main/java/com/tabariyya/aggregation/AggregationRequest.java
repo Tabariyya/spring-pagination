@@ -29,7 +29,7 @@ public class AggregationRequest<TEntity> {
         return aggregationQuery.fetch(filtered(query));
     }
 
-    public List<Group> fetchGroups(JPAQuery<TEntity> query) {
+    public List<AggregationGroup> fetchGroups(JPAQuery<TEntity> query) {
         return aggregationQuery.fetchGroups(filtered(query));
     }
 

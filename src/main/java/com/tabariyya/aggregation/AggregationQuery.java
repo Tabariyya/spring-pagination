@@ -4,6 +4,9 @@ import com.tabariyya.pagination.PathBuilders;
 import com.tabariyya.pagination.GenericQueryDslException;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.Ops;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.PathBuilder;
 import com.querydsl.jpa.impl.JPAQuery;
 
@@ -80,16 +83,19 @@ public final class AggregationQuery {
         return tuple == null ? Collections.emptyMap() : aggregations.read(tuple);
     }
 
-    public List<Group> fetchGroups(JPAQuery<?> query) {
+    public List<AggregationGroup> fetchGroups(JPAQuery<?> query) {
         if (!isGrouped()) {
             throw new IllegalStateException("This aggregation has no group by; call fetch instead");
         }
 
         Expression<?>[] keyExpressions = groupBy.expressions();
         Expression<?>[] valueExpressions = aggregations.expressions();
-        Expression<?>[] projection = new Expression<?>[keyExpressions.length + valueExpressions.length];
+        NumberExpression<Long> rowCount = Expressions.numberOperation(Long.class, Ops.AggOps.COUNT_ALL_AGG);
+
+        Expression<?>[] projection = new Expression<?>[keyExpressions.length + valueExpressions.length + 1];
         System.arraycopy(keyExpressions, 0, projection, 0, keyExpressions.length);
         System.arraycopy(valueExpressions, 0, projection, keyExpressions.length, valueExpressions.length);
+        projection[projection.length - 1] = rowCount;
 
         List<Tuple> tuples = query.clone()
                 .select(projection)
@@ -103,11 +109,30 @@ public final class AggregationQuery {
                     + " groups; narrow the filter or group by fewer fields");
         }
 
-        List<Group> groups = new ArrayList<>(tuples.size());
+        long grandTotal = 0L;
         for (Tuple tuple : tuples) {
-            groups.add(new Group(groupBy.read(tuple), aggregations.read(tuple)));
+            Long total = tuple.get(rowCount);
+            grandTotal += total == null ? 0L : total;
+        }
+
+        List<AggregationGroup> groups = new ArrayList<>(tuples.size());
+        for (Tuple tuple : tuples) {
+            Long total = tuple.get(rowCount);
+            long rows = total == null ? 0L : total;
+
+            List<AggregationEntry> data = new ArrayList<>(groupBy.entries(tuple));
+            data.addAll(aggregations.entries(tuple));
+
+            groups.add(new AggregationGroup(data, percentage(rows, grandTotal), rows));
         }
         return groups;
+    }
+
+    private static double percentage(long rows, long grandTotal) {
+        if (grandTotal == 0L) {
+            return 0d;
+        }
+        return Math.round(rows * 10000d / grandTotal) / 100d;
     }
 
     private List<String> groupByFieldNames() {

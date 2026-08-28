@@ -35,6 +35,14 @@ public final class AggregationSpec {
         return expressions;
     }
 
+    public List<AggregationEntry> entries(Tuple tuple) {
+        List<AggregationEntry> entries = new ArrayList<>(aggregations.size());
+        for (Aggregation<?> aggregation : aggregations) {
+            entries.add(aggregation.entry(tuple));
+        }
+        return entries;
+    }
+
     public Map<String, Object> read(Tuple tuple) {
         Map<String, Object> values = new LinkedHashMap<>();
         for (Aggregation<?> aggregation : aggregations) {

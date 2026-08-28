@@ -46,6 +46,14 @@ public final class GroupBySpec {
         return ordering;
     }
 
+    public List<AggregationEntry> entries(Tuple tuple) {
+        List<AggregationEntry> entries = new ArrayList<>(keys.size());
+        for (GroupKey<?> key : keys) {
+            entries.add(key.entry(tuple));
+        }
+        return entries;
+    }
+
     public Map<String, Object> read(Tuple tuple) {
         Map<String, Object> values = new LinkedHashMap<>();
         for (GroupKey<?> key : keys) {

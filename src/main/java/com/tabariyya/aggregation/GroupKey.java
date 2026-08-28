@@ -16,4 +16,8 @@ public record GroupKey<T>(String field, Class<T> type, Expression<T> expression)
     public T extract(Tuple tuple) {
         return TupleValues.read(tuple, expression, type, field);
     }
+
+    public AggregationEntry entry(Tuple tuple) {
+        return new AggregationEntry(field, extract(tuple), AggregationEntry.GROUPED_BY);
+    }
 }
