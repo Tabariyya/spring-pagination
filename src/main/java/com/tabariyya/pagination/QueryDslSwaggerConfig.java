@@ -82,8 +82,6 @@ public class QueryDslSwaggerConfig {
         };
     }
 
-
-
     /**
      * Handlers with a QuerySpec parameter declare a List return type, but
      * PaginationResponseAdvice wraps it into a PaginatedResult at runtime;

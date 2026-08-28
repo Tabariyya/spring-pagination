@@ -46,7 +46,6 @@ public class QueryBuilderService {
         }
     }
 
-
     /**
      * Rejects any filter or sort field that the response type does not declare,
      * so clients can only filter and order by fields they can see in the
@@ -70,15 +69,6 @@ public class QueryBuilderService {
             throw new GenericQueryDslException(e);
         }
     }
-
-
-
-
-
-
-
-
-
 
     private void checkFilterFields(JsonNode node, Class<?> responseType) {
         if (!node.isObject()) {
@@ -179,14 +169,6 @@ public class QueryBuilderService {
             throw new GenericQueryDslException(e);
         }
     }
-
-
-
-
-
-
-
-
 
     private OrderSpecifier<?>[] orderSpecifierBuilder(Class<?> entity, String query) throws Throwable {
         PathBuilder<?> pathBuilder = PathBuilders.of(entity);

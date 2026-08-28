@@ -31,7 +31,6 @@ public class GenericExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 
-
     @ExceptionHandler(CursorParameterConflictException.class)
     public ResponseEntity<String> handleCursorParameterConflictException(CursorParameterConflictException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());

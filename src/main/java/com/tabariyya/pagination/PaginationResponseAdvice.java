@@ -38,8 +38,7 @@ public class PaginationResponseAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        Object attribute =
-                requestAttributes.getAttribute(QuerySpec.class.getName(), RequestAttributes.SCOPE_REQUEST);
+        Object attribute = requestAttributes.getAttribute(QuerySpec.class.getName(), RequestAttributes.SCOPE_REQUEST);
         if (!(attribute instanceof QuerySpec<?> querySpec)) {
             return body;
         }
