@@ -7,33 +7,30 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.MethodParameter;
 import org.springframework.web.method.HandlerMethod;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Configuration
 public class QueryDslSwaggerConfig {
 
     @Bean
-    public OperationCustomizer hideResolvedQueryParameters() {
+    public OperationCustomizer hideQueryDslContextHolderByType() {
         return (Operation operation, HandlerMethod handlerMethod) -> {
+            Class<?>[] parameterTypes = handlerMethod.getMethod().getParameterTypes();
             List<Parameter> swaggerParams = operation.getParameters();
-            if (swaggerParams == null) {
-                return operation;
+
+            if (swaggerParams != null) {
+                IntStream.range(0, parameterTypes.length)
+                        .filter(i -> QuerySpec.class.isAssignableFrom(parameterTypes[i]))
+                        .forEach(index -> {
+                            if (index < swaggerParams.size()) {
+                                swaggerParams.remove(index);
+                            }
+                        });
             }
-
-            Set<String> resolvedNames = Arrays.stream(handlerMethod.getMethodParameters())
-                    .filter(p -> QuerySpec.class.isAssignableFrom(p.getParameterType()))
-                    .map(MethodParameter::getParameterName)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            swaggerParams.removeIf(parameter -> resolvedNames.contains(parameter.getName()));
 
             return operation;
         };

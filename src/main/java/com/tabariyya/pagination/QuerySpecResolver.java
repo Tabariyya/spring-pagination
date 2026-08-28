@@ -123,6 +123,10 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
      * return type is not a list.
      */
     private Class<?> resolveResponseType(MethodParameter parameter, Class<?> entity) {
+        PageOf pageOf = parameter.getParameterAnnotation(PageOf.class);
+        if (pageOf != null) {
+            return pageOf.value();
+        }
         if (parameter.getMethod() == null) {
             return entity;
         }
