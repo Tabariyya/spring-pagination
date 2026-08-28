@@ -11,7 +11,8 @@ public enum AggregateFunction {
     MIN("$min"),
     MAX("$max"),
     COUNT("$count"),
-    COUNT_DISTINCT("$countDistinct");
+    COUNT_DISTINCT("$countDistinct"),
+    GROUPED_BY(null);
 
     private static final Map<String, AggregateFunction> BY_OPERATOR = byOperator();
 
@@ -37,7 +38,9 @@ public enum AggregateFunction {
     private static Map<String, AggregateFunction> byOperator() {
         Map<String, AggregateFunction> byOperator = new LinkedHashMap<>();
         for (AggregateFunction function : values()) {
-            byOperator.put(function.operator, function);
+            if (function.operator != null) {
+                byOperator.put(function.operator, function);
+            }
         }
         return Collections.unmodifiableMap(byOperator);
     }

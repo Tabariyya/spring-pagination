@@ -20,6 +20,6 @@ public record Aggregation<T>(
     }
 
     public AggregationEntry entry(Tuple tuple) {
-        return new AggregationEntry(field == null ? alias : field, extract(tuple), function.name());
+        return new AggregationEntry(field == null ? alias : field, extract(tuple), function);
     }
 }

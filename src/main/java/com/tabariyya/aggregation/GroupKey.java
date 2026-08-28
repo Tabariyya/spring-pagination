@@ -18,6 +18,6 @@ public record GroupKey<T>(String field, Class<T> type, Expression<T> expression)
     }
 
     public AggregationEntry entry(Tuple tuple) {
-        return new AggregationEntry(field, extract(tuple), AggregationEntry.GROUPED_BY);
+        return new AggregationEntry(field, extract(tuple), AggregateFunction.GROUPED_BY);
     }
 }
