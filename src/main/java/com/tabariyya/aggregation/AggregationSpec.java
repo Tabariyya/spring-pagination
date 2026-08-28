@@ -40,11 +40,4 @@ public final class AggregationSpec {
         return entries;
     }
 
-    public Map<String, Object> read(Tuple tuple) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        for (Aggregation<?> aggregation : aggregations) {
-            values.put(aggregation.alias(), aggregation.extract(tuple));
-        }
-        return Collections.unmodifiableMap(values);
-    }
 }

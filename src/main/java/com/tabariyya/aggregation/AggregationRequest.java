@@ -14,20 +14,11 @@ import java.util.Map;
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class AggregationRequest<TEntity> {
 
-    private AggregationQuery aggregationQuery = AggregationQuery.of(AggregationSpec.EMPTY);
+    private AggregationQuery aggregationQuery = AggregationQuery.of(AggregationSpec.EMPTY, GroupBySpec.EMPTY);
     private Predicate filter;
 
-    public boolean isEmpty() {
-        return aggregationQuery.isEmpty();
-    }
 
-    public boolean isGrouped() {
-        return aggregationQuery.isGrouped();
-    }
 
-    public Map<String, Object> fetch(JPAQuery<TEntity> query) {
-        return aggregationQuery.fetch(filtered(query));
-    }
 
     public List<AggregationGroup> fetchGroups(JPAQuery<TEntity> query) {
         return aggregationQuery.fetchGroups(filtered(query));
@@ -40,7 +31,7 @@ public class AggregationRequest<TEntity> {
 
     public void setAggregationQuery(AggregationQuery aggregationQuery) {
         this.aggregationQuery = aggregationQuery == null
-                ? AggregationQuery.of(AggregationSpec.EMPTY)
+                ? AggregationQuery.of(AggregationSpec.EMPTY, GroupBySpec.EMPTY)
                 : aggregationQuery;
     }
 
