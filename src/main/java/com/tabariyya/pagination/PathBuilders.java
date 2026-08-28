@@ -8,7 +8,7 @@ public final class PathBuilders {
     }
 
     public static <T> PathBuilder<T> of(Class<T> entity) {
-        return  new PathBuilder<>(entity, decapitalize(entity.getSimpleName()));
+        return new PathBuilder<>(entity, decapitalize(entity.getSimpleName()));
     }
 
     private static String decapitalize(String name) {
