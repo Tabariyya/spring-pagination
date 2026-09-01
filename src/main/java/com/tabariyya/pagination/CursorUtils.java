@@ -39,11 +39,30 @@ public final class CursorUtils {
                 lastValues.put(fieldName, field.get(lastEntity));
             }
 
-            Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(), querySpec.getLimit(), lastValues);
+            Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(), querySpec.getLimit(),
+                    lastValues, new LinkedHashMap<>(querySpec.getCursorAttributes()));
             byte[] json = objectMapper.writeValueAsBytes(cursor);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
+        }
+    }
+
+    /**
+     * Converts a cursor attribute to the type the caller asked for. Values set
+     * during the current request are returned as they are when they already fit;
+     * values restored from a cursor come back as plain JSON types and are mapped
+     * onto the requested one.
+     */
+    static <T> T convertAttribute(String key, Object value, Class<T> type) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.convertValue(value, type);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidCursorException(
+                    "Cannot convert cursor attribute '" + key + "' to " + type.getSimpleName() + ": " + value, e);
         }
     }
 

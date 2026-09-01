@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS)
@@ -27,17 +29,19 @@ public class QuerySpec<TEntity> {
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
+    private final Map<String, Object> attributes = new LinkedHashMap<>();
 
     /**
-     * Applies the ordering and limit to the given query, fetches the page and
-     * remembers the last row so {@link #getNextCursor()} can build the cursor
-     * for the next page. On the first request the total count is fetched in the
-     * same query via a window function and exposed through {@link #getCount()};
-     * cursor requests skip it.
+     * Applies the filter, the ordering and the limit to the given query, fetches
+     * the page and remembers the last row so {@link #getNextCursor()} can build
+     * the cursor for the next page. The filter also carries the keyset condition
+     * of a cursor request, so callers must not skip it. On the first request the
+     * total count is fetched in the same query via a window function and exposed
+     * through {@link #getCount()}; cursor requests skip it.
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
-        query.orderBy(orderSpecifiers).limit(limit);
+        query.where(predicate).orderBy(orderSpecifiers).limit(limit);
 
         if (cursorRequest) {
             List<TEntity> rows = query.fetch();
@@ -114,6 +118,47 @@ public class QuerySpec<TEntity> {
     }
     public void setOrdering(String ordering) {
         this.ordering = ordering;
+    }
+
+    /**
+     * Stores an application-defined value that travels with the pagination
+     * cursor: whatever is on the spec when the response is written is encoded
+     * into the next cursor and restored here on the follow-up request. Values
+     * must be JSON-serializable, and the cursor is client-visible, so keep them
+     * small and never put anything secret in one.
+     */
+    public void setCursorAttribute(String key, Object value) {
+        attributes.put(key, value);
+    }
+
+    /**
+     * Returns the raw attribute as it currently stands. On a cursor request the
+     * value comes back from JSON, so a non-scalar arrives as a Map or List;
+     * use {@link #getCursorAttribute(String, Class)} to get the original type back.
+     */
+    public Object getCursorAttribute(String key) {
+        return attributes.get(key);
+    }
+
+    /**
+     * Returns the attribute converted to the given type, or null when it is absent.
+     */
+    public <T> T getCursorAttribute(String key, Class<T> type) {
+        return CursorUtils.convertAttribute(key, attributes.get(key), type);
+    }
+
+    public Map<String, Object> getCursorAttributes() {
+        return attributes;
+    }
+
+    /**
+     * Replaces all attributes; used by the resolver to seed them from an incoming cursor.
+     */
+    public void setCursorAttributes(Map<String, Object> newAttributes) {
+        attributes.clear();
+        if (newAttributes != null) {
+            attributes.putAll(newAttributes);
+        }
     }
 
     public boolean isCursorRequest() {

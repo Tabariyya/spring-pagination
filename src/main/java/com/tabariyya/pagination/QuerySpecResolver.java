@@ -67,6 +67,7 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             sort = cursor.getOrdering();
             size = cursor.getSize();
             lastValues = cursor.getLastValues();
+            querySpec.setCursorAttributes(cursor.getAttributes());
             querySpec.setCursorRequest(true);
         } else {
             filter = request.getParameter("filters");
