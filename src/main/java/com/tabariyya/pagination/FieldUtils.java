@@ -52,7 +52,7 @@ public final class FieldUtils {
         searchEmbedded(type, fieldName, "", embedded, new HashSet<>());
 
         if (embedded.size() == 1) {
-            return embedded.getFirst();
+            return embedded.get(0);
         }
         if (embedded.size() > 1) {
             throw new NoSuchFieldException(fieldName + " is ambiguous on " + type.getName() + ": it matches "

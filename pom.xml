@@ -6,12 +6,11 @@
 
     <groupId>com.tabariyya</groupId>
     <artifactId>spring-pagination</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>6.2.8</spring.version>
         <querydsl.version>5.1.0</querydsl.version>
