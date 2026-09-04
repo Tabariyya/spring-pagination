@@ -26,6 +26,7 @@ public class QuerySpec<TEntity> {
     private Class<?> entityClass;
     private String filters;
     private String ordering;
+    private String requestedOrdering;
     private Object lastRow;
     private boolean cursorRequest;
     private Long count;
@@ -113,11 +114,44 @@ public class QuerySpec<TEntity> {
         this.filters = filters;
     }
 
+    /**
+     * The ordering actually applied: always non-null, always ending in the id tie-breaker, and equal
+     * to {@code {"id":1}} when the caller asked for no ordering at all. Use {@link #hasOrdering()} to
+     * tell that default apart from an ordering someone asked for.
+     */
     public String getOrdering() {
         return ordering;
     }
     public void setOrdering(String ordering) {
         this.ordering = ordering;
+    }
+
+    /**
+     * Whether the caller asked for an ordering of their own.
+     *
+     * <p>{@link #getOrdering()} cannot answer this: it is never null, because a request without an
+     * ordering is given {@code {"id":1}} so that paging has a stable sort, and one with an ordering
+     * has the same id appended as a tie-breaker. Both end up mentioning id, so the string alone does
+     * not say who asked for it. This does, and it keeps saying it on the later pages of a cursor.
+     *
+     * <p>An explicitly requested {@code {"id":1}} counts as an ordering: the caller named it, even
+     * though it matches what the default would have been.
+     */
+    public boolean hasOrdering() {
+        return requestedOrdering != null;
+    }
+
+    /**
+     * The ordering as the caller wrote it, or null when they asked for none - the raw form behind
+     * {@link #hasOrdering()}, for callers that want to look at what was asked for.
+     */
+    public String getRequestedOrdering() {
+        return requestedOrdering;
+    }
+    public void setRequestedOrdering(String requestedOrdering) {
+        this.requestedOrdering = (requestedOrdering == null || requestedOrdering.isBlank())
+                ? null
+                : requestedOrdering;
     }
 
     /**

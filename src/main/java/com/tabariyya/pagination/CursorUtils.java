@@ -38,7 +38,8 @@ public final class CursorUtils {
                 lastValues.put(fieldName, resolved.valueIn(lastEntity));
             }
 
-            Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(), querySpec.getLimit(),
+            Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(),
+                    querySpec.getRequestedOrdering(), querySpec.getLimit(),
                     lastValues, new LinkedHashMap<>(querySpec.getCursorAttributes()));
             byte[] json = objectMapper.writeValueAsBytes(cursor);
             return Base64.getUrlEncoder().withoutPadding().encodeToString(json);

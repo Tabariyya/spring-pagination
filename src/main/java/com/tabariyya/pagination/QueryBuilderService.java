@@ -101,6 +101,19 @@ public class QueryBuilderService {
      * Appends {"id": 1} to the sort specification when "id" is not already present,
      * so that the ordering is total and keyset pagination never skips or repeats rows.
      */
+    /**
+     * The ordering as the caller wrote it, url-decoded and re-serialized so that it reads the same
+     * way {@link #ensureIdTieBreaker} leaves the applied one - without adding the tie-breaker, since
+     * this is meant to record what was asked for rather than what will run.
+     */
+    public String normalizeOrdering(String query) {
+        try {
+            return objectMapper.writeValueAsString(decodeAndDeserialize(query));
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
     public String ensureIdTieBreaker(String query) {
         try {
             JsonNode root = decodeAndDeserialize(query);

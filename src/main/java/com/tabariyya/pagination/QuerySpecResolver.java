@@ -52,7 +52,9 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
 
         String filter;
         String sort;
+        String requestedSort;
         Integer size;
+        boolean fromCursor = false;
         Map<String, Object> lastValues = null;
 
         if (cursorToken != null && !cursorToken.isEmpty()) {
@@ -65,13 +67,16 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             Cursor cursor = CursorUtils.decode(cursorToken);
             filter = cursor.getFilters();
             sort = cursor.getOrdering();
+            requestedSort = cursor.getRequestedOrdering();
             size = cursor.getSize();
             lastValues = cursor.getLastValues();
             querySpec.setCursorAttributes(cursor.getAttributes());
             querySpec.setCursorRequest(true);
+            fromCursor = true;
         } else {
             filter = request.getParameter("filters");
             sort = request.getParameter("ordering");
+            requestedSort = sort;
             size = parseSize(request.getParameter("size"));
             queryBuilderService.validateFieldsAgainstResponse(resolveResponseType(parameter, entity), filter, sort);
         }
@@ -80,6 +85,12 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             sort = "{\"id\":1}";
         }
         sort = queryBuilderService.ensureIdTieBreaker(sort);
+
+        // Off a cursor it was normalized when the first page was served; off the query string it is
+        // still url-encoded, and it is recorded the way getOrdering() reads.
+        if (requestedSort != null && !requestedSort.isEmpty() && !fromCursor) {
+            requestedSort = queryBuilderService.normalizeOrdering(requestedSort);
+        }
 
         if (size == null) {
             size = 20;
@@ -100,6 +111,7 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
         querySpec.setEntityClass(entity);
         querySpec.setFilters(filter);
         querySpec.setOrdering(sort);
+        querySpec.setRequestedOrdering(requestedSort);
 
         request.setAttribute(QuerySpec.class.getName(), querySpec);
 

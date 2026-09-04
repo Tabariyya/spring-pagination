@@ -5,6 +5,7 @@ import java.util.Map;
 public class Cursor {
     private String filters;
     private String ordering;
+    private String requestedOrdering;
     private Integer size;
     private Map<String, Object> lastValues;
     private Map<String, Object> attributes;
@@ -12,10 +13,11 @@ public class Cursor {
     public Cursor() {
     }
 
-    public Cursor(String filters, String ordering, Integer size, Map<String, Object> lastValues,
-                  Map<String, Object> attributes) {
+    public Cursor(String filters, String ordering, String requestedOrdering, Integer size,
+                  Map<String, Object> lastValues, Map<String, Object> attributes) {
         this.filters = filters;
         this.ordering = ordering;
+        this.requestedOrdering = requestedOrdering;
         this.size = size;
         this.lastValues = lastValues;
         this.attributes = attributes;
@@ -33,6 +35,18 @@ public class Cursor {
     }
     public void setOrdering(String ordering) {
         this.ordering = ordering;
+    }
+
+    /**
+     * The ordering as the caller wrote it, before a default and the id tie-breaker were applied;
+     * null when they asked for none. Carried so that later pages report the same answer the first
+     * page did. Absent from cursors issued before this field existed, which read back as null.
+     */
+    public String getRequestedOrdering() {
+        return requestedOrdering;
+    }
+    public void setRequestedOrdering(String requestedOrdering) {
+        this.requestedOrdering = requestedOrdering;
     }
 
     public Integer getSize() {
