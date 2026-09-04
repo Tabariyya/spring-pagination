@@ -34,9 +34,8 @@ public final class CursorUtils {
             Iterator<String> fieldNames = ordering.fieldNames();
             while (fieldNames.hasNext()) {
                 String fieldName = fieldNames.next();
-                Field field = FieldUtils.findField(querySpec.getEntityClass(), fieldName);
-                field.setAccessible(true);
-                lastValues.put(fieldName, field.get(lastEntity));
+                ResolvedField resolved = FieldUtils.resolve(querySpec.getEntityClass(), fieldName);
+                lastValues.put(fieldName, resolved.valueIn(lastEntity));
             }
 
             Cursor cursor = new Cursor(querySpec.getFilters(), querySpec.getOrdering(), querySpec.getLimit(),

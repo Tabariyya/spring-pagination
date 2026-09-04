@@ -90,7 +90,7 @@ public class QueryBuilderService {
 
     private void checkResponseField(Class<?> responseType, String fieldName) {
         try {
-            FieldUtils.findField(responseType, fieldName);
+            FieldUtils.resolve(responseType, fieldName);
         } catch (NoSuchFieldException e) {
             throw new UnknownResponseFieldException(
                     "Cannot filter or order by '" + fieldName + "': the response does not contain this field");
@@ -137,8 +137,9 @@ public class QueryBuilderService {
                 if (!lastValues.containsKey(fieldName)) {
                     throw new InvalidCursorException("Cursor is missing last value for sort field: " + fieldName);
                 }
-                Class<?> fieldType = FieldUtils.findField(entity, fieldName).getType();
-                fieldNames.add(fieldName);
+                ResolvedField resolved = FieldUtils.resolve(entity, fieldName);
+                Class<?> fieldType = resolved.type();
+                fieldNames.add(resolved.path());
                 orders.add(entry.getValue().asInt() == 1 ? Order.ASC : Order.DESC);
                 values.add(convertValue(lastValues.get(fieldName), fieldType));
             }
@@ -149,14 +150,14 @@ public class QueryBuilderService {
                 for (int j = 0; j < i; j++) {
                     branch.and(Expressions.predicate(
                             Ops.EQ,
-                            pathBuilder.get(fieldNames.get(j)),
+                            PathBuilders.get(pathBuilder, fieldNames.get(j)),
                             ConstantImpl.create(values.get(j))
                     ));
                 }
                 Ops comparison = (orders.get(i) == Order.ASC) ? Ops.GT : Ops.LT;
                 branch.and(Expressions.predicate(
                         comparison,
-                        pathBuilder.get(fieldNames.get(i)),
+                        PathBuilders.get(pathBuilder, fieldNames.get(i)),
                         ConstantImpl.create(values.get(i))
                 ));
                 keyset.or(branch);
@@ -196,7 +197,7 @@ public class QueryBuilderService {
             }
 
             Order order = (sortValue == 1) ? Order.ASC : Order.DESC;
-            Expression<?> fieldPath = pathBuilder.get(fieldName);
+            Expression<?> fieldPath = PathBuilders.get(pathBuilder, FieldUtils.resolve(entity, fieldName).path());
             orderSpecifiers.add(new OrderSpecifier(order, fieldPath));
         }
 
@@ -304,13 +305,15 @@ public class QueryBuilderService {
     }
 
     private Predicate processFieldCondition(String fieldName, JsonNode condition, PathBuilder<?> pathBuilder, Class<?> entityClass) throws Exception {
-        Field field = FieldUtils.findField(entityClass, fieldName);
+        ResolvedField resolved = FieldUtils.resolve(entityClass, fieldName);
+        Field field = resolved.field();
+        PathBuilder<?> fieldPath = PathBuilders.get(pathBuilder, resolved.path());
 
         if (!condition.isObject()) {
             Object convertedValue = convertValue(condition.asText(), field.getType());
             return Expressions.predicate(
                     Ops.EQ,
-                    pathBuilder.get(fieldName),
+                    fieldPath,
                     ConstantImpl.create(convertedValue)
             );
         }
@@ -333,7 +336,7 @@ public class QueryBuilderService {
 
             return Expressions.booleanTemplate(
                     "function('regex_matches_ic', {0}, {1}) = true",
-                    pathBuilder.get(fieldName),
+                    fieldPath,
                     ConstantImpl.create(regex)
             );
         }
@@ -343,7 +346,7 @@ public class QueryBuilderService {
 
             return Expressions.booleanTemplate(
                     "function('trgm_similar', {0}, {1}) = true",
-                    pathBuilder.get(fieldName),
+                    fieldPath,
                     ConstantImpl.create(term)
             );
         }
@@ -361,14 +364,14 @@ public class QueryBuilderService {
             }
             return Expressions.predicate(
                     queryDslOp,
-                    pathBuilder.get(fieldName),
+                    fieldPath,
                     ConstantImpl.create(values)
             );
         } else {
             Object convertedValue = convertValue(parseMongoValue(valueNode), field.getType());
             return Expressions.predicate(
                     queryDslOp,
-                    pathBuilder.get(fieldName),
+                    fieldPath,
                     ConstantImpl.create(convertedValue)
             );
         }
