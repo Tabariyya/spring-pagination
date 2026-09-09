@@ -2,6 +2,7 @@ package com.tabariyya.pagination;
 
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.EntityPath;
+import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.Expressions;
@@ -39,6 +40,12 @@ public class QuerySpec<TEntity> {
      * of a cursor request, so callers must not skip it. On the first request the
      * total count is fetched in the same query via a window function and exposed
      * through {@link #getCount()}; cursor requests skip it.
+     *
+     * <p>A projection the caller selected is kept. The count is a window function, so it has to ride
+     * along in the select list, and pairing it with the query's own projection rather than with the
+     * root is what keeps a {@code select(...)} of the caller's - a {@code MappingProjection} that
+     * computes a distance, say - from being quietly dropped on the first page and honoured on every
+     * cursor page after it.
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
@@ -50,17 +57,31 @@ public class QuerySpec<TEntity> {
             return rows;
         }
 
-        EntityPath<TEntity> root = (EntityPath<TEntity>) query.getMetadata().getJoins().get(0).getTarget();
+        Expression<?> projection = projectionOf(query);
         NumberExpression<Long> totalCount = Expressions.numberTemplate(Long.class, "count(*) over ()");
-        List<Tuple> tuples = query.select(root, totalCount).fetch();
+        List<Tuple> tuples = query.select(projection, totalCount).fetch();
 
         count = tuples.isEmpty() ? 0L : tuples.get(0).get(totalCount);
         List<TEntity> rows = new ArrayList<>(tuples.size());
         for (Tuple tuple : tuples) {
-            rows.add(tuple.get(root));
+            rows.add((TEntity) tuple.get(0, Object.class));
         }
         lastRow = rows.isEmpty() ? null : rows.get(rows.size() - 1);
         return rows;
+    }
+
+    /**
+     * What the query returns a row as: the caller's own {@code select(...)}, or the root entity when
+     * they never named one - which is what {@code selectFrom} leaves behind anyway. Package-private so
+     * that it can be checked without a database.
+     */
+    @SuppressWarnings("unchecked")
+    static <TEntity> Expression<?> projectionOf(JPAQuery<TEntity> query) {
+        Expression<?> projection = query.getMetadata().getProjection();
+
+        return projection != null
+                ? projection
+                : (EntityPath<TEntity>) query.getMetadata().getJoins().get(0).getTarget();
     }
 
     /**
