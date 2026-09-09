@@ -355,7 +355,19 @@ public class QueryBuilderService {
         }
 
         if ("$similar".equals(operatorKey)) {
+            if (field.getType() != String.class) {
+                throw new IllegalArgumentException(
+                        "$similar is only supported on text fields, but '" + fieldName + "' is "
+                                + field.getType().getSimpleName());
+            }
+            if (!valueNode.isTextual()) {
+                throw new IllegalArgumentException("$similar requires a string term for field: " + fieldName);
+            }
+
             String term = valueNode.asText();
+            if (term.isBlank()) {
+                throw new IllegalArgumentException("$similar requires a non-blank term for field: " + fieldName);
+            }
 
             return Expressions.booleanTemplate(
                     "function('trgm_similar', {0}, {1}) = true",
