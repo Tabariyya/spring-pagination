@@ -15,9 +15,19 @@ public class AggregationRequest<TEntity> {
 
     private AggregationQuery aggregationQuery = AggregationQuery.of(AggregationSpec.EMPTY, GroupBySpec.EMPTY);
     private Predicate filter;
+    private List<AggregationGroup> groups;
 
     public List<AggregationGroup> fetchGroups(JPAQuery<TEntity> query) {
-        return aggregationQuery.fetchGroups(filtered(query));
+        groups = aggregationQuery.fetchGroups(filtered(query));
+        return groups;
+    }
+
+    public boolean hasAggregations() {
+        return !aggregationQuery.isEmpty();
+    }
+
+    public List<AggregationGroup> getGroups() {
+        return groups;
     }
 
     private JPAQuery<TEntity> filtered(JPAQuery<TEntity> query) {

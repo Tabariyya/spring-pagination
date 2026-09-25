@@ -95,6 +95,7 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         aggregationRequest.setAggregationQuery(AggregationQuery.of(aggregationSpec, groupBySpec));
         aggregationRequest.setFilter(hasFilters ? queryBuilderService.buildFilter(entity, filters) : null);
+        request.setAttribute(AggregationRequest.class.getName(), aggregationRequest);
 
         return aggregationRequest;
     }

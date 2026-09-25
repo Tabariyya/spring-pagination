@@ -1,5 +1,7 @@
 package com.tabariyya.pagination;
 
+import com.tabariyya.aggregation.AggregationGroup;
+import com.tabariyya.aggregation.AggregationRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -43,6 +45,11 @@ public class PaginationResponseAdvice implements ResponseBodyAdvice<Object> {
             return body;
         }
 
-        return new PaginatedResult<>(querySpec.getCount(), results, querySpec.getNextCursor());
+        Object aggregation = requestAttributes.getAttribute(AggregationRequest.class.getName(), RequestAttributes.SCOPE_REQUEST);
+        List<AggregationGroup> groups = aggregation instanceof AggregationRequest<?> aggregationRequest
+                ? aggregationRequest.getGroups()
+                : null;
+
+        return new PaginatedResult<>(querySpec.getCount(), results, querySpec.getNextCursor(), groups);
     }
 }
