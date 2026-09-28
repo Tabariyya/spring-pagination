@@ -72,10 +72,10 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
         if (aggregateOver != null) {
-            aggregationQueryBuilder.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
-            aggregationQueryBuilder.validateGroupByAgainstFields(aggregateOver.groupBy(), aggregations);
+            aggregationQueryBuilder.validateAggregationsAgainstFields(entity, aggregateOver.aggregate(), aggregations);
+            aggregationQueryBuilder.validateGroupByAgainstFields(entity, aggregateOver.groupBy(), aggregations);
             if (hasFilters) {
-                aggregationQueryBuilder.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
+                aggregationQueryBuilder.validateFiltersAgainstFields(entity, filterFields(aggregateOver), filters);
             }
         } else {
             Class<?> projection = resolveProjectionType(parameter, entity);

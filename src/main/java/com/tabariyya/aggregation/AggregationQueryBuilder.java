@@ -51,18 +51,18 @@ public class AggregationQueryBuilder {
         validateAggregations(aggregationQuery, fieldName -> checkResponseField(responseType, fieldName));
     }
 
-    public void validateAggregationsAgainstFields(String[] allowedFields, String aggregationQuery) {
+    public void validateAggregationsAgainstFields(Class<?> entity, String[] allowedFields, String aggregationQuery) {
         Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
-        validateAggregations(aggregationQuery, fieldName -> checkAllowedField(allowed, fieldName, "aggregate"));
+        validateAggregations(aggregationQuery, fieldName -> checkAllowedField(entity, allowed, fieldName, "aggregate"));
     }
 
     public void validateGroupByAgainstResponse(Class<?> responseType, String groupByQuery) {
         validateGroupBy(groupByQuery, fieldName -> checkResponseField(responseType, fieldName));
     }
 
-    public void validateGroupByAgainstFields(String[] allowedFields, String groupByQuery) {
+    public void validateGroupByAgainstFields(Class<?> entity, String[] allowedFields, String groupByQuery) {
         Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
-        validateGroupBy(groupByQuery, fieldName -> checkAllowedField(allowed, fieldName, "group by"));
+        validateGroupBy(groupByQuery, fieldName -> checkAllowedField(entity, allowed, fieldName, "group by"));
     }
 
     private void validateAggregations(String aggregationQuery, Consumer<String> check) {
@@ -103,13 +103,13 @@ public class AggregationQueryBuilder {
         }
     }
 
-    public void validateFiltersAgainstFields(String[] allowedFields, String filterQuery) {
+    public void validateFiltersAgainstFields(Class<?> entity, String[] allowedFields, String filterQuery) {
         if (filterQuery == null || filterQuery.isEmpty()) {
             return;
         }
         try {
             Set<String> allowed = new LinkedHashSet<>(Arrays.asList(allowedFields));
-            collectFilterFields(decodeAndDeserialize(filterQuery)).forEach(f -> checkAllowedField(allowed, f, "filter by"));
+            collectFilterFields(decodeAndDeserialize(filterQuery)).forEach(f -> checkAllowedField(entity, allowed, f, "filter by"));
         } catch (UnknownResponseFieldException e) {
             throw e;
         } catch (Throwable e) {
@@ -137,8 +137,8 @@ public class AggregationQueryBuilder {
         return names;
     }
 
-    private void checkAllowedField(Set<String> allowed, String fieldName, String action) {
-        if (!allowed.contains(fieldName)) {
+    private void checkAllowedField(Class<?> entity, Set<String> allowed, String fieldName, String action) {
+        if (!allowed.contains(entity.getCanonicalName() + "#" + fieldName)) {
             throw new UnknownResponseFieldException("Cannot " + action + " '" + fieldName
                     + "' on this endpoint; fields you can " + action + " are "
                     + (allowed.isEmpty() ? "none" : String.join(", ", allowed)));

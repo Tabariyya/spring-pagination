@@ -9,13 +9,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * An endpoint taking an AggregationRequest has to say which fields it allows, either through
- * {@link AggregateOver} or through the element type it returns; these pin down which ones the verifier
- * turns away at startup.
+ * {@link AggregateOver} references to its own entity's fields or through the element type it returns;
+ * these pin down which ones the verifier turns away at startup.
  */
 class AggregationRequestVerifierTest {
 
+    private static final String SCORE = "com.tabariyya.aggregation.AggregationRequestVerifierTest.TestActivity#score";
+    private static final String OTHER_SCORE = "com.tabariyya.aggregation.AggregationRequestVerifierTest.OtherEntity#score";
+    private static final String RANK = "com.tabariyya.aggregation.AggregationRequestVerifierTest.TestActivity#rank";
+
     @Test
-    void endpoint_withAggregateOver_passes() throws NoSuchMethodException {
+    void endpoint_namingItsEntitysField_passes() throws NoSuchMethodException {
         assertThat(violationsOf("annotated")).isEmpty();
     }
 
@@ -30,6 +34,27 @@ class AggregationRequestVerifierTest {
         assertThat(violationsOf("unannotatedWithResponses")).isEmpty();
     }
 
+    @Test
+    void endpoint_namingAPlainFieldName_isReported() throws NoSuchMethodException {
+        assertThat(violationsOf("withPlainName")).containsExactly(violation("withPlainName", "score"));
+    }
+
+    @Test
+    void endpoint_namingAnotherEntitysField_isReported() throws NoSuchMethodException {
+        assertThat(violationsOf("withOtherEntitysField")).containsExactly(violation("withOtherEntitysField", OTHER_SCORE));
+    }
+
+    @Test
+    void endpoint_namingAFieldTheEntityLacks_isReported() throws NoSuchMethodException {
+        assertThat(violationsOf("withUnknownField")).containsExactly(violation("withUnknownField", RANK));
+    }
+
+    private static String violation(String methodName, String reference) {
+        return "TestController#" + methodName + " names " + reference
+                + ", which is not a field reference of TestActivity"
+                + " (expected com.tabariyya.aggregation.AggregationRequestVerifierTest.TestActivity#field)";
+    }
+
     private static List<String> violationsOf(String methodName) throws NoSuchMethodException {
         HandlerMethod handlerMethod = new HandlerMethod(
                 new TestController(), TestController.class.getMethod(methodName, AggregationRequest.class));
@@ -39,7 +64,7 @@ class AggregationRequestVerifierTest {
     public static class TestController {
 
         public List<AggregationGroup> annotated(
-                @AggregateOver(groupBy = "score") AggregationRequest<TestActivity> aggregationRequest) {
+                @AggregateOver(groupBy = SCORE) AggregationRequest<TestActivity> aggregationRequest) {
             return List.of();
         }
 
@@ -50,9 +75,28 @@ class AggregationRequestVerifierTest {
         public List<TestResponse> unannotatedWithResponses(AggregationRequest<TestActivity> aggregationRequest) {
             return List.of();
         }
+
+        public List<AggregationGroup> withPlainName(
+                @AggregateOver(groupBy = "score") AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
+
+        public List<AggregationGroup> withOtherEntitysField(
+                @AggregateOver(groupBy = OTHER_SCORE) AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
+
+        public List<AggregationGroup> withUnknownField(
+                @AggregateOver(groupBy = RANK) AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
     }
 
     private static class TestActivity {
+        private int score;
+    }
+
+    private static class OtherEntity {
         private int score;
     }
 
