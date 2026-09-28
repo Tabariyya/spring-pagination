@@ -109,8 +109,8 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
     }
 
     private Class<?> resolveProjectionType(MethodParameter parameter, Class<?> entity) {
-        Class<?> responseType = resolveResponseElementType(parameter);
-        if (responseType == null || responseType == AggregationGroup.class || Map.class.isAssignableFrom(responseType)) {
+        Class<?> responseType = responseFieldSource(parameter);
+        if (responseType == null) {
             throw new InvalidAggregationException("Cannot tell which fields of " + entity.getSimpleName()
                     + " may be aggregated on this endpoint; annotate the AggregationRequest parameter with"
                     + " @AggregateOver(groupBy = {...}, aggregate = {...})");
@@ -118,7 +118,15 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         return responseType;
     }
 
-    private Class<?> resolveResponseElementType(MethodParameter parameter) {
+    static Class<?> responseFieldSource(MethodParameter parameter) {
+        Class<?> responseType = resolveResponseElementType(parameter);
+        if (responseType == null || responseType == AggregationGroup.class || Map.class.isAssignableFrom(responseType)) {
+            return null;
+        }
+        return responseType;
+    }
+
+    private static Class<?> resolveResponseElementType(MethodParameter parameter) {
         if (parameter.getMethod() == null) {
             return null;
         }
