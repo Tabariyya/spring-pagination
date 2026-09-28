@@ -14,6 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AggregationRequestVerifierTest {
 
+    private static final String SCORE = "com.tabariyya.aggregation.AggregationRequestVerifierTest.TestActivity#score";
+    private static final String OTHER_SCORE = "com.tabariyya.aggregation.AggregationRequestVerifierTest.OtherEntity#score";
+
     @Test
     void endpoint_withAggregateOver_passes() throws NoSuchMethodException {
         assertThat(violationsOf("annotated")).isEmpty();
@@ -28,6 +31,24 @@ class AggregationRequestVerifierTest {
     @Test
     void endpoint_returningResponsesWithoutAggregateOver_passes() throws NoSuchMethodException {
         assertThat(violationsOf("unannotatedWithResponses")).isEmpty();
+    }
+
+    @Test
+    void endpoint_namingItsEntitysConstant_passes() throws NoSuchMethodException {
+        assertThat(violationsOf("withConstant")).isEmpty();
+    }
+
+    @Test
+    void endpoint_namingAnotherEntitysConstant_isReported() throws NoSuchMethodException {
+        assertThat(violationsOf("withOtherEntitysConstant"))
+                .containsExactly("TestController#withOtherEntitysConstant names " + OTHER_SCORE
+                        + ", which is not a field of TestActivity");
+    }
+
+    @Test
+    void endpoint_namingAFieldTheEntityLacks_isReported() throws NoSuchMethodException {
+        assertThat(violationsOf("withUnknownField"))
+                .containsExactly("TestController#withUnknownField names rank, which is not a field of TestActivity");
     }
 
     private static List<String> violationsOf(String methodName) throws NoSuchMethodException {
@@ -50,9 +71,28 @@ class AggregationRequestVerifierTest {
         public List<TestResponse> unannotatedWithResponses(AggregationRequest<TestActivity> aggregationRequest) {
             return List.of();
         }
+
+        public List<AggregationGroup> withConstant(
+                @AggregateOver(groupBy = SCORE) AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
+
+        public List<AggregationGroup> withOtherEntitysConstant(
+                @AggregateOver(groupBy = OTHER_SCORE) AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
+
+        public List<AggregationGroup> withUnknownField(
+                @AggregateOver(groupBy = "rank") AggregationRequest<TestActivity> aggregationRequest) {
+            return List.of();
+        }
     }
 
     private static class TestActivity {
+        private int score;
+    }
+
+    private static class OtherEntity {
         private int score;
     }
 

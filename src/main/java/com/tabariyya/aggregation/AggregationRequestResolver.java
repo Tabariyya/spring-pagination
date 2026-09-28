@@ -72,10 +72,10 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
 
         AggregateOver aggregateOver = parameter.getParameterAnnotation(AggregateOver.class);
         if (aggregateOver != null) {
-            aggregationQueryBuilder.validateAggregationsAgainstFields(aggregateOver.aggregate(), aggregations);
-            aggregationQueryBuilder.validateGroupByAgainstFields(aggregateOver.groupBy(), aggregations);
+            aggregationQueryBuilder.validateAggregationsAgainstFields(fieldNames(aggregateOver.aggregate()), aggregations);
+            aggregationQueryBuilder.validateGroupByAgainstFields(fieldNames(aggregateOver.groupBy()), aggregations);
             if (hasFilters) {
-                aggregationQueryBuilder.validateFiltersAgainstFields(filterFields(aggregateOver), filters);
+                aggregationQueryBuilder.validateFiltersAgainstFields(fieldNames(filterFields(aggregateOver)), filters);
             }
         } else {
             Class<?> projection = resolveProjectionType(parameter, entity);
@@ -97,6 +97,12 @@ public class AggregationRequestResolver implements HandlerMethodArgumentResolver
         aggregationRequest.setFilter(hasFilters ? queryBuilderService.buildFilter(entity, filters) : null);
 
         return aggregationRequest;
+    }
+
+    static String[] fieldNames(String[] references) {
+        return Arrays.stream(references)
+                .map(reference -> reference.substring(reference.indexOf('#') + 1))
+                .toArray(String[]::new);
     }
 
     private String[] filterFields(AggregateOver aggregateOver) {
