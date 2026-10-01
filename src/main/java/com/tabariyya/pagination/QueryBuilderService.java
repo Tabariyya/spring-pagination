@@ -322,6 +322,10 @@ public class QueryBuilderService {
         Field field = resolved.field();
         PathBuilder<?> fieldPath = PathBuilders.get(pathBuilder, resolved.path());
 
+        if (condition.isNull()) {
+            return fieldPath.isNull();
+        }
+
         if (!condition.isObject()) {
             Object convertedValue = convertValue(condition.asText(), field.getType());
             return Expressions.predicate(
@@ -339,6 +343,18 @@ public class QueryBuilderService {
         Map.Entry<String, JsonNode> entry = operators.next();
         String operatorKey = entry.getKey();
         JsonNode valueNode = entry.getValue();
+
+        if (valueNode.isNull()) {
+            if ("$eq".equals(operatorKey)) {
+                return fieldPath.isNull();
+            }
+            if ("$ne".equals(operatorKey)) {
+                return fieldPath.isNotNull();
+            }
+            if (!"$not".equals(operatorKey)) {
+                throw new IllegalArgumentException(operatorKey + " does not accept null for field: " + fieldName);
+            }
+        }
 
         if ("$not".equals(operatorKey)) {
             return processFieldCondition(fieldName, valueNode, pathBuilder, entityClass).not();
