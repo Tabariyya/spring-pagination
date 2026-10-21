@@ -13,6 +13,9 @@ import java.lang.reflect.Field;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.temporal.Temporal;
+import java.util.Date;
 import java.util.Map;
 
 final class AggregateExpressions {
@@ -45,8 +48,28 @@ final class AggregateExpressions {
         };
     }
 
-    static GroupKey<?> key(Class<?> entity, PathBuilder<?> pathBuilder, String fieldName) throws NoSuchFieldException {
-        return groupKey(pathBuilder, fieldName, fieldType(entity, fieldName));
+    static GroupKey<?> key(Class<?> entity, PathBuilder<?> pathBuilder, GroupByField field) throws NoSuchFieldException {
+        Class<?> fieldType = fieldType(entity, field.name());
+        if (!field.isTransformed()) {
+            return groupKey(pathBuilder, field.name(), fieldType);
+        }
+
+        requireTemporal(field, fieldType);
+        Expression<?> path = pathBuilder.get(field.name());
+        if (field.truncatesDate()) {
+            return new GroupKey<>(field.name(), LocalDate.class, Expressions.dateTemplate(LocalDate.class,
+                    "cast(function('date_trunc', '" + field.dateUnit().unitName() + "', {0}) as LocalDate)",
+                    path));
+        }
+        return new GroupKey<>(field.name(), Integer.class,
+                Expressions.numberTemplate(Integer.class, "year(current_date) - year({0})", path));
+    }
+
+    static void requireTemporal(GroupByField field, Class<?> fieldType) {
+        if (!Temporal.class.isAssignableFrom(fieldType) && !Date.class.isAssignableFrom(fieldType)) {
+            throw new InvalidAggregationException(field.operatorName()
+                    + " needs a date field, but '" + field.name() + "' is " + fieldType.getSimpleName());
+        }
     }
 
     static Class<?> fieldType(Class<?> entity, String fieldName) throws NoSuchFieldException {
