@@ -95,7 +95,9 @@ public class AggregationQueryBuilder {
             return;
         }
         try {
-            groupByFieldNames(groupByQuery).forEach(check);
+            for (GroupByField field : groupByFields(groupByQuery)) {
+                check.accept(field.name());
+            }
         } catch (UnknownResponseFieldException | InvalidAggregationException e) {
             throw e;
         } catch (Throwable e) {
@@ -172,27 +174,27 @@ public class AggregationQueryBuilder {
 
     private GroupBySpec groupByBuilder(Class<?> entity, String query) throws Throwable {
         PathBuilder<?> pathBuilder = PathBuilders.of(entity);
-        List<String> fieldNames = groupByFieldNames(query);
+        List<GroupByField> fields = groupByFields(query);
 
-        if (fieldNames.isEmpty()) {
+        if (fields.isEmpty()) {
             throw new InvalidAggregationException(
                     GROUP_KEY + " is required; name at least one field to group the aggregates by");
         }
 
         List<GroupKey<?>> keys = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        for (String fieldName : fieldNames) {
-            if (!seen.add(fieldName)) {
+        for (GroupByField field : fields) {
+            if (!seen.add(field.name())) {
                 throw new InvalidAggregationException(
-                        GROUP_KEY + " names '" + fieldName + "' more than once");
+                        GROUP_KEY + " names '" + field.name() + "' more than once");
             }
-            keys.add(AggregateExpressions.key(entity, pathBuilder, fieldName));
+            keys.add(AggregateExpressions.key(entity, pathBuilder, field));
         }
 
         return new GroupBySpec(keys);
     }
 
-    private List<String> groupByFieldNames(String query) throws Exception {
+    private List<GroupByField> groupByFields(String query) throws Exception {
         JsonNode root = decodeAndDeserialize(query);
         if (!root.isObject()) {
             throw new InvalidAggregationException("Aggregation specification must be a JSON object");
@@ -203,30 +205,20 @@ public class AggregationQueryBuilder {
             return List.of();
         }
 
-        List<String> fieldNames = new ArrayList<>();
+        List<GroupByField> fields = new ArrayList<>();
         if (key.isTextual()) {
             for (String part : key.asText().split(",", -1)) {
-                fieldNames.add(stripFieldPrefix(part.trim()));
+                fields.add(GroupByField.plain(part));
             }
         } else if (key.isArray()) {
             for (JsonNode element : key) {
-                if (!element.isTextual()) {
-                    throw new InvalidAggregationException(
-                            GROUP_KEY + " must hold field names as strings, for example [\"$score\"]");
-                }
-                fieldNames.add(stripFieldPrefix(element.asText().trim()));
+                fields.add(GroupByField.from(element));
             }
         } else {
             throw new InvalidAggregationException(
-                    GROUP_KEY + " must be a field name or an array of field names");
+                    GROUP_KEY + " must be a field name or an array of field names and operators");
         }
-
-        for (String fieldName : fieldNames) {
-            if (fieldName.isEmpty()) {
-                throw new InvalidAggregationException(GROUP_KEY + " contains an empty field name");
-            }
-        }
-        return fieldNames;
+        return fields;
     }
 
     private Aggregation<?> buildAggregation(String operator, JsonNode operand,
