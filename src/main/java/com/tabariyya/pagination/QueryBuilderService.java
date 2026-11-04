@@ -5,11 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.*;
+import com.querydsl.core.types.dsl.CollectionPath;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.PathBuilder;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
@@ -322,6 +325,10 @@ public class QueryBuilderService {
         Field field = resolved.field();
         PathBuilder<?> fieldPath = PathBuilders.get(pathBuilder, resolved.path());
 
+        if (Collection.class.isAssignableFrom(field.getType())) {
+            return processCollectionCondition(fieldName, condition, pathBuilder, resolved);
+        }
+
         if (condition.isNull()) {
             return fieldPath.isNull();
         }
@@ -416,6 +423,97 @@ public class QueryBuilderService {
                     ConstantImpl.create(convertedValue)
             );
         }
+    }
+
+    /**
+     * Filters on a collection field (a {@code Set<Gender>} element collection, say) the way MongoDB
+     * filters on an array: the operators test the collection's elements, not the collection itself.
+     *
+     * <ul>
+     *   <li>{@code "MALE"} or {@code {"$eq":"MALE"}}: the collection contains {@code MALE}.</li>
+     *   <li>{@code {"$ne":"MALE"}}: it does not contain {@code MALE}.</li>
+     *   <li>{@code {"$in":["MALE","FEMALE"]}}: it contains at least one of them.</li>
+     *   <li>{@code {"$nin":["MALE","FEMALE"]}}: it contains none of them.</li>
+     *   <li>{@code {"$not":{...}}}: the negation of any of the above.</li>
+     * </ul>
+     *
+     * <p>Values are converted to the element type, read from the field's generic signature. Converting
+     * them to the field's own type, as the scalar path does, would ask Jackson to turn {@code "MALE"}
+     * into a {@code Set}.
+     */
+    private Predicate processCollectionCondition(
+            String fieldName, JsonNode condition, PathBuilder<?> pathBuilder, ResolvedField resolved) {
+        CollectionPath<Object, ?> collection = collectionPath(pathBuilder, resolved);
+
+        if (condition.isNull()) {
+            throw new IllegalArgumentException("Collection field '" + fieldName + "' cannot be compared to null");
+        }
+
+        if (!condition.isObject()) {
+            return collection.contains(elementValue(condition, collection));
+        }
+
+        Iterator<Map.Entry<String, JsonNode>> operators = condition.fields();
+        if (!operators.hasNext()) {
+            throw new IllegalArgumentException("Empty condition for field: " + fieldName);
+        }
+
+        Map.Entry<String, JsonNode> entry = operators.next();
+        String operatorKey = entry.getKey();
+        JsonNode valueNode = entry.getValue();
+
+        switch (operatorKey) {
+            case "$not":
+                return processCollectionCondition(fieldName, valueNode, pathBuilder, resolved).not();
+            case "$eq":
+                return collection.contains(elementValue(valueNode, collection));
+            case "$ne":
+                return collection.contains(elementValue(valueNode, collection)).not();
+            case "$in":
+                return containsAnyOf(fieldName, operatorKey, valueNode, collection);
+            case "$nin":
+                return containsAnyOf(fieldName, operatorKey, valueNode, collection).not();
+            default:
+                throw new IllegalArgumentException(
+                        operatorKey + " is not supported on collection field: " + fieldName);
+        }
+    }
+
+    private Predicate containsAnyOf(
+            String fieldName, String operatorKey, JsonNode valueNode, CollectionPath<Object, ?> collection) {
+        if (!valueNode.isArray() || valueNode.isEmpty()) {
+            throw new IllegalArgumentException(operatorKey + " requires a non-empty array for field: " + fieldName);
+        }
+
+        List<Predicate> contains = new ArrayList<>();
+        for (JsonNode element : valueNode) {
+            contains.add(collection.contains(elementValue(element, collection)));
+        }
+        return ExpressionUtils.anyOf(contains);
+    }
+
+    private Object elementValue(JsonNode valueNode, CollectionPath<Object, ?> collection) {
+        if (valueNode.isNull() || valueNode.isContainerNode()) {
+            throw new IllegalArgumentException(
+                    "Expected a single value for collection field: " + collection.getMetadata().getName());
+        }
+        return convertValue(parseMongoValue(valueNode), collection.getElementType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CollectionPath<Object, ?> collectionPath(PathBuilder<?> root, ResolvedField resolved) {
+        Type generic = resolved.field().getGenericType();
+        if (!(generic instanceof ParameterizedType parameterized)
+                || !(parameterized.getActualTypeArguments()[0] instanceof Class<?> elementType)) {
+            throw new IllegalArgumentException(
+                    "Cannot filter on collection field '" + resolved.path() + "' without a concrete element type");
+        }
+
+        String path = resolved.path();
+        int lastDot = path.lastIndexOf('.');
+        PathBuilder<?> parent = lastDot < 0 ? root : PathBuilders.get(root, path.substring(0, lastDot));
+        return (CollectionPath<Object, ?>) (CollectionPath<?, ?>)
+                parent.getCollection(path.substring(lastDot + 1), elementType);
     }
 
     private Ops mapMongoOperator(String mongoOp) {
