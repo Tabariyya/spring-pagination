@@ -32,6 +32,8 @@ public class QuerySpec<TEntity> {
     private boolean cursorRequest;
     private Long count;
     private final Map<String, Object> attributes = new LinkedHashMap<>();
+    private Map<String, Expression<?>> virtualSortExpressions = Map.of();
+    private Map<String, Object> lastVirtualValues = Map.of();
 
     /**
      * Applies the filter, the ordering and the limit to the given query, fetches
@@ -46,27 +48,53 @@ public class QuerySpec<TEntity> {
      * root is what keeps a {@code select(...)} of the caller's - a {@code MappingProjection} that
      * computes a distance, say - from being quietly dropped on the first page and honoured on every
      * cursor page after it.
+     *
+     * <p>The ordering's virtual fields ride along the same way. The next cursor needs the last row's
+     * value of every field the page is ordered by, and a virtual field has no field on the entity to
+     * read it back from, so its expression is selected next to the row and the last row's values are
+     * kept - on every page, cursor pages included, since every page hands out a cursor.
      */
     @SuppressWarnings("unchecked")
     public List<TEntity> fetchPage(JPAQuery<TEntity> query) {
         query.where(predicate).orderBy(orderSpecifiers).limit(limit);
+        lastVirtualValues = Map.of();
 
-        if (cursorRequest) {
+        if (cursorRequest && virtualSortExpressions.isEmpty()) {
             List<TEntity> rows = query.fetch();
             lastRow = rows.isEmpty() ? null : rows.get(rows.size() - 1);
             return rows;
         }
 
-        Expression<?> projection = projectionOf(query);
-        NumberExpression<Long> totalCount = Expressions.numberTemplate(Long.class, "count(*) over ()");
-        List<Tuple> tuples = query.select(projection, totalCount).fetch();
+        List<Expression<?>> selected = new ArrayList<>();
+        selected.add(projectionOf(query));
+        NumberExpression<Long> totalCount =
+                cursorRequest ? null : Expressions.numberTemplate(Long.class, "count(*) over ()");
+        if (totalCount != null) {
+            selected.add(totalCount);
+        }
+        int firstVirtual = selected.size();
+        selected.addAll(virtualSortExpressions.values());
 
-        count = tuples.isEmpty() ? 0L : tuples.get(0).get(totalCount);
+        List<Tuple> tuples = query.select(selected.toArray(new Expression<?>[0])).fetch();
+
+        if (totalCount != null) {
+            count = tuples.isEmpty() ? 0L : tuples.get(0).get(totalCount);
+        }
         List<TEntity> rows = new ArrayList<>(tuples.size());
         for (Tuple tuple : tuples) {
             rows.add((TEntity) tuple.get(0, Object.class));
         }
         lastRow = rows.isEmpty() ? null : rows.get(rows.size() - 1);
+
+        if (!tuples.isEmpty() && !virtualSortExpressions.isEmpty()) {
+            Tuple last = tuples.get(tuples.size() - 1);
+            Map<String, Object> values = new LinkedHashMap<>();
+            int column = firstVirtual;
+            for (String name : virtualSortExpressions.keySet()) {
+                values.put(name, last.get(column++, Object.class));
+            }
+            lastVirtualValues = values;
+        }
         return rows;
     }
 
@@ -98,6 +126,26 @@ public class QuerySpec<TEntity> {
      */
     public String getNextCursor() {
         return CursorUtils.nextCursor(this, lastRow);
+    }
+
+    /**
+     * The virtual fields the ordering names, with the expression each is queried as; set by the
+     * resolver, and selected by {@link #fetchPage} so the next cursor can carry their values.
+     */
+    public Map<String, Expression<?>> getVirtualSortExpressions() {
+        return virtualSortExpressions;
+    }
+    public void setVirtualSortExpressions(Map<String, Expression<?>> virtualSortExpressions) {
+        this.virtualSortExpressions =
+                virtualSortExpressions == null ? Map.of() : new LinkedHashMap<>(virtualSortExpressions);
+    }
+
+    /** The last fetched row's value of each virtual field the page was ordered by; may hold nulls. */
+    Map<String, Object> getLastVirtualValues() {
+        return lastVirtualValues;
+    }
+    void setLastVirtualValues(Map<String, ?> lastVirtualValues) {
+        this.lastVirtualValues = new LinkedHashMap<>(lastVirtualValues);
     }
 
     public Predicate getFilterQuery() {

@@ -8,6 +8,8 @@ import com.querydsl.core.types.*;
 import com.querydsl.core.types.dsl.CollectionPath;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.PathBuilder;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Field;
@@ -33,6 +35,73 @@ public class QueryBuilderService {
             .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
             .toFormatter();
 
+    private final Map<Class<?>, VirtualFields> virtualFields;
+
+    public QueryBuilderService() {
+        this(List.of());
+    }
+
+    /** With the {@link VirtualFields} the application declared as beans; none is fine. */
+    @Autowired
+    public QueryBuilderService(ObjectProvider<VirtualFields> virtualFields) {
+        this(virtualFields.orderedStream().toList());
+    }
+
+    public QueryBuilderService(Collection<VirtualFields> virtualFields) {
+        Map<Class<?>, VirtualFields> byEntity = new HashMap<>();
+        for (VirtualFields fields : virtualFields) {
+            VirtualFields merged = byEntity.computeIfAbsent(fields.entity(), VirtualFields::of);
+            fields.fields().values().forEach(field -> register(merged, field));
+        }
+        this.virtualFields = Map.copyOf(byEntity);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void register(VirtualFields into, VirtualFields.VirtualField field) {
+        into.field(field.name(), (Class) field.type(), (Expression) field.expression());
+    }
+
+    /** The virtual field registered on the entity under that name, if any. */
+    public Optional<VirtualFields.VirtualField> virtualField(Class<?> entity, String name) {
+        VirtualFields fields = entity == null ? null : virtualFields.get(entity);
+        return fields == null ? Optional.empty() : fields.find(name);
+    }
+
+    /**
+     * The virtual fields an ordering names, in its order, with the expression each is queried as.
+     * {@link QuerySpec#fetchPage} selects these alongside the row, because the next cursor needs the
+     * last row's value of each and the entity has no field to read it from.
+     */
+    public Map<String, Expression<?>> virtualSortExpressions(Class<?> entity, String orderingQuery) {
+        try {
+            Map<String, Expression<?>> expressions = new LinkedHashMap<>();
+            if (orderingQuery == null || orderingQuery.isEmpty()) {
+                return expressions;
+            }
+            decodeAndDeserialize(orderingQuery).fieldNames().forEachRemaining(name -> virtualField(entity, name)
+                    .ifPresent(field -> expressions.put(name, field.expression())));
+            return expressions;
+        } catch (Throwable e) {
+            throw new GenericQueryDslException(e);
+        }
+    }
+
+    /**
+     * A name from a request as something a query can use: the registered expression of a virtual
+     * field, or the path of a real one.
+     */
+    private Target target(Class<?> entity, PathBuilder<?> root, String name) throws NoSuchFieldException {
+        Optional<VirtualFields.VirtualField> virtual = virtualField(entity, name);
+        if (virtual.isPresent()) {
+            return new Target(virtual.get().expression(), virtual.get().type(), null);
+        }
+        ResolvedField resolved = FieldUtils.resolve(entity, name);
+        return new Target(PathBuilders.get(root, resolved.path()), resolved.type(), resolved);
+    }
+
+    /** What a name is queried as, the type its values convert to, and the real field behind it, if one. */
+    private record Target(Expression<?> expression, Class<?> type, ResolvedField field) {}
+
     public Predicate buildFilter(Class<?> entity, String query) {
         try {
             return predicateBuilder(entity, query);
@@ -56,14 +125,24 @@ public class QueryBuilderService {
      * {@link #ensureIdTieBreaker} appends the internal id tie-breaker.
      */
     public void validateFieldsAgainstResponse(Class<?> responseType, String filterQuery, String orderingQuery) {
+        validateFieldsAgainstResponse(responseType, null, filterQuery, orderingQuery);
+    }
+
+    /**
+     * As {@link #validateFieldsAgainstResponse(Class, String, String)}, also accepting the virtual
+     * fields registered on {@code entity}: the response does not carry them, and that is the point.
+     */
+    public void validateFieldsAgainstResponse(
+            Class<?> responseType, Class<?> entity, String filterQuery, String orderingQuery) {
         try {
             if (filterQuery != null && !filterQuery.isEmpty()) {
-                checkFilterFields(decodeAndDeserialize(filterQuery), responseType);
+                checkFilterFields(decodeAndDeserialize(filterQuery), responseType, entity);
             }
             if (orderingQuery != null && !orderingQuery.isEmpty()) {
                 JsonNode root = decodeAndDeserialize(orderingQuery);
                 if (root.isObject()) {
-                    root.fieldNames().forEachRemaining(fieldName -> checkResponseField(responseType, fieldName));
+                    root.fieldNames()
+                            .forEachRemaining(fieldName -> checkResponseField(responseType, entity, fieldName));
                 }
             }
         } catch (UnknownResponseFieldException e) {
@@ -73,7 +152,7 @@ public class QueryBuilderService {
         }
     }
 
-    private void checkFilterFields(JsonNode node, Class<?> responseType) {
+    private void checkFilterFields(JsonNode node, Class<?> responseType, Class<?> entity) {
         if (!node.isObject()) {
             return;
         }
@@ -81,17 +160,20 @@ public class QueryBuilderService {
             if (entry.getKey().startsWith("$")) {
                 JsonNode value = entry.getValue();
                 if (value.isArray()) {
-                    value.forEach(item -> checkFilterFields(item, responseType));
+                    value.forEach(item -> checkFilterFields(item, responseType, entity));
                 } else {
-                    checkFilterFields(value, responseType);
+                    checkFilterFields(value, responseType, entity);
                 }
             } else {
-                checkResponseField(responseType, entry.getKey());
+                checkResponseField(responseType, entity, entry.getKey());
             }
         });
     }
 
-    private void checkResponseField(Class<?> responseType, String fieldName) {
+    private void checkResponseField(Class<?> responseType, Class<?> entity, String fieldName) {
+        if (virtualField(entity, fieldName).isPresent()) {
+            return;
+        }
         try {
             FieldUtils.resolve(responseType, fieldName);
         } catch (NoSuchFieldException e) {
@@ -142,7 +224,7 @@ public class QueryBuilderService {
             PathBuilder<?> pathBuilder = PathBuilders.of(entity);
             JsonNode root = decodeAndDeserialize(orderingQuery);
 
-            List<String> fieldNames = new ArrayList<>();
+            List<Expression<?>> targets = new ArrayList<>();
             List<Order> orders = new ArrayList<>();
             List<Object> values = new ArrayList<>();
 
@@ -153,27 +235,26 @@ public class QueryBuilderService {
                 if (!lastValues.containsKey(fieldName)) {
                     throw new InvalidCursorException("Cursor is missing last value for sort field: " + fieldName);
                 }
-                ResolvedField resolved = FieldUtils.resolve(entity, fieldName);
-                Class<?> fieldType = resolved.type();
-                fieldNames.add(resolved.path());
+                Target target = target(entity, pathBuilder, fieldName);
+                targets.add(target.expression());
                 orders.add(entry.getValue().asInt() == 1 ? Order.ASC : Order.DESC);
-                values.add(convertValue(lastValues.get(fieldName), fieldType));
+                values.add(convertValue(lastValues.get(fieldName), target.type()));
             }
 
             BooleanBuilder keyset = new BooleanBuilder();
-            for (int i = 0; i < fieldNames.size(); i++) {
+            for (int i = 0; i < targets.size(); i++) {
                 BooleanBuilder branch = new BooleanBuilder();
                 for (int j = 0; j < i; j++) {
                     branch.and(Expressions.predicate(
                             Ops.EQ,
-                            PathBuilders.get(pathBuilder, fieldNames.get(j)),
+                            targets.get(j),
                             ConstantImpl.create(values.get(j))
                     ));
                 }
                 Ops comparison = (orders.get(i) == Order.ASC) ? Ops.GT : Ops.LT;
                 branch.and(Expressions.predicate(
                         comparison,
-                        PathBuilders.get(pathBuilder, fieldNames.get(i)),
+                        targets.get(i),
                         ConstantImpl.create(values.get(i))
                 ));
                 keyset.or(branch);
@@ -213,7 +294,7 @@ public class QueryBuilderService {
             }
 
             Order order = (sortValue == 1) ? Order.ASC : Order.DESC;
-            Expression<?> fieldPath = PathBuilders.get(pathBuilder, FieldUtils.resolve(entity, fieldName).path());
+            Expression<?> fieldPath = target(entity, pathBuilder, fieldName).expression();
             orderSpecifiers.add(new OrderSpecifier(order, fieldPath));
         }
 
@@ -321,20 +402,23 @@ public class QueryBuilderService {
     }
 
     private Predicate processFieldCondition(String fieldName, JsonNode condition, PathBuilder<?> pathBuilder, Class<?> entityClass) throws Exception {
-        ResolvedField resolved = FieldUtils.resolve(entityClass, fieldName);
-        Field field = resolved.field();
-        PathBuilder<?> fieldPath = PathBuilders.get(pathBuilder, resolved.path());
+        Target target = target(entityClass, pathBuilder, fieldName);
+        ResolvedField resolved = target.field();
+        Expression<?> fieldPath = target.expression();
+        // A real field converts its values to its declared type, as it always has; a virtual one to
+        // the type it was registered with.
+        Class<?> valueType = resolved != null ? resolved.field().getType() : target.type();
 
-        if (Collection.class.isAssignableFrom(field.getType())) {
+        if (resolved != null && Collection.class.isAssignableFrom(resolved.field().getType())) {
             return processCollectionCondition(fieldName, condition, pathBuilder, resolved);
         }
 
         if (condition.isNull()) {
-            return fieldPath.isNull();
+            return Expressions.predicate(Ops.IS_NULL, fieldPath);
         }
 
         if (!condition.isObject()) {
-            Object convertedValue = convertValue(condition.asText(), field.getType());
+            Object convertedValue = convertValue(condition.asText(), valueType);
             return Expressions.predicate(
                     Ops.EQ,
                     fieldPath,
@@ -353,10 +437,10 @@ public class QueryBuilderService {
 
         if (valueNode.isNull()) {
             if ("$eq".equals(operatorKey)) {
-                return fieldPath.isNull();
+                return Expressions.predicate(Ops.IS_NULL, fieldPath);
             }
             if ("$ne".equals(operatorKey)) {
-                return fieldPath.isNotNull();
+                return Expressions.predicate(Ops.IS_NOT_NULL, fieldPath);
             }
             if (!"$not".equals(operatorKey)) {
                 throw new IllegalArgumentException(operatorKey + " does not accept null for field: " + fieldName);
@@ -378,10 +462,10 @@ public class QueryBuilderService {
         }
 
         if ("$similar".equals(operatorKey)) {
-            if (field.getType() != String.class) {
+            if (valueType != String.class) {
                 throw new IllegalArgumentException(
                         "$similar is only supported on text fields, but '" + fieldName + "' is "
-                                + field.getType().getSimpleName());
+                                + valueType.getSimpleName());
             }
             if (!valueNode.isTextual()) {
                 throw new IllegalArgumentException("$similar requires a string term for field: " + fieldName);
@@ -407,7 +491,7 @@ public class QueryBuilderService {
             }
             List<Object> values = new ArrayList<>();
             for (JsonNode element : valueNode) {
-                Object convertedElement = convertValue(parseMongoValue(element), field.getType());
+                Object convertedElement = convertValue(parseMongoValue(element), valueType);
                 values.add(convertedElement);
             }
             return Expressions.predicate(
@@ -416,7 +500,7 @@ public class QueryBuilderService {
                     ConstantImpl.create(values)
             );
         } else {
-            Object convertedValue = convertValue(parseMongoValue(valueNode), field.getType());
+            Object convertedValue = convertValue(parseMongoValue(valueNode), valueType);
             return Expressions.predicate(
                     queryDslOp,
                     fieldPath,

@@ -34,6 +34,11 @@ public final class CursorUtils {
             Iterator<String> fieldNames = ordering.fieldNames();
             while (fieldNames.hasNext()) {
                 String fieldName = fieldNames.next();
+                if (querySpec.getVirtualSortExpressions().containsKey(fieldName)
+                        || querySpec.getLastVirtualValues().containsKey(fieldName)) {
+                    lastValues.put(fieldName, virtualValue(querySpec, fieldName));
+                    continue;
+                }
                 ResolvedField resolved = FieldUtils.resolve(querySpec.getEntityClass(), fieldName);
                 lastValues.put(fieldName, resolved.valueIn(lastEntity));
             }
@@ -46,6 +51,20 @@ public final class CursorUtils {
         } catch (Throwable e) {
             throw new GenericQueryDslException(e);
         }
+    }
+
+    /**
+     * A virtual field's value on the last row, as {@link QuerySpec#fetchPage} selected it. Null is
+     * refused: the next page asks for rows past it, nothing compares past a null, and the listing would
+     * quietly end early.
+     */
+    private static Object virtualValue(QuerySpec<?> querySpec, String fieldName) {
+        Object value = querySpec.getLastVirtualValues().get(fieldName);
+        if (value == null) {
+            throw new IllegalStateException("Virtual field '" + fieldName + "' was null on the last row of the page; "
+                    + "its expression must never be null (wrap it in coalesce), or paging would skip rows");
+        }
+        return value;
     }
 
     /**

@@ -78,7 +78,8 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
             sort = request.getParameter("ordering");
             requestedSort = sort;
             size = parseSize(request.getParameter("size"));
-            queryBuilderService.validateFieldsAgainstResponse(resolveResponseType(parameter, entity), filter, sort);
+            queryBuilderService.validateFieldsAgainstResponse(
+                    resolveResponseType(parameter, entity), entity, filter, sort);
         }
 
         if (sort == null || sort.isEmpty()) {
@@ -112,6 +113,7 @@ public class QuerySpecResolver implements HandlerMethodArgumentResolver {
         querySpec.setFilters(filter);
         querySpec.setOrdering(sort);
         querySpec.setRequestedOrdering(requestedSort);
+        querySpec.setVirtualSortExpressions(queryBuilderService.virtualSortExpressions(entity, sort));
 
         request.setAttribute(QuerySpec.class.getName(), querySpec);
 

@@ -62,6 +62,16 @@ public final class FieldUtils {
                 + ", its superclasses and its embedded values)");
     }
 
+    /** Whether {@link #resolve} would find the name on the entity. */
+    public static boolean resolves(Class<?> type, String fieldName) {
+        try {
+            resolve(type, fieldName);
+            return true;
+        } catch (NoSuchFieldException notAField) {
+            return false;
+        }
+    }
+
     private static ResolvedField resolvePath(Class<?> type, String path) throws NoSuchFieldException {
         Class<?> current = type;
         Field field = null;
